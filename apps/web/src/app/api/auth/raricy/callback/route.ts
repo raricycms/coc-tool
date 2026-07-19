@@ -43,6 +43,11 @@ async function fetchUserInfo(accessToken: string): Promise<{ sub: string; userna
 }
 
 export async function GET(req: NextRequest) {
+  // 公网 origin 必须从 WEB_ORIGIN 读取：req.url 在反代后是 localhost:7766，
+  // 直接用 req.url 拼 Location 会让浏览器跳回内网地址。
+  // 在 apps/web/.env.local 里覆盖 WEB_ORIGIN 即可指向真实域名/端口。
+  const publicOrigin = process.env.WEB_ORIGIN || 'http://localhost:7766';
+
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
@@ -52,7 +57,7 @@ export async function GET(req: NextRequest) {
     cookieStore.delete('oauth_state');
 
     if (!code || !state || state !== expectedState) {
-      return NextResponse.redirect(new URL('/login?error=oauth_state', req.url), 302);
+      return NextResponse.redirect(new URL('/login?error=oauth_state', publicOrigin), 302);
     }
 
     const token = await exchangeCode(code);
@@ -91,10 +96,9 @@ export async function GET(req: NextRequest) {
     });
 
     await issueSession(user.id, user.username);
-    return NextResponse.redirect(new URL('/dashboard', req.url), 302);
+    return NextResponse.redirect(new URL('/dashboard', publicOrigin), 302);
   } catch (e) {
     console.error('raricy callback error', e);
-    const url = new URL(req.url);
-    return NextResponse.redirect(new URL('/login?error=oauth_callback', url.origin), 302);
+    return NextResponse.redirect(new URL('/login?error=oauth_callback', publicOrigin), 302);
   }
 }

@@ -74,7 +74,39 @@
 
 ---
 
-## 5. 非目标（v0.1 不做）
+## 5. 首次运行（从零启动）
+
+```bash
+# 1. 装依赖（含 prisma 5 + Next.js 15 + Socket.IO 4 等）
+npm install
+
+# 2. 生成 .env（自动从 .env.example 复制到 monorepo 根，并生成 SESSION_SECRET）
+npm run db:setup      # packages/db/scripts/setup-env.mjs
+
+# 3. 生成 Prisma client（生成到 node_modules/.prisma/client/，每次 clone 必跑）
+npm run db:generate
+
+# 4. 推 schema 到 SQLite（首次必跑，之后改 schema 时再跑）
+npm run db:push
+
+# 5. 启动两端
+npm run dev:realtime   # :4000 Socket.IO
+npm run dev:web        # :3000 Next.js
+
+# 6. 跑测试
+npm test --workspaces --if-present
+```
+
+> **关键**：Prisma client 是从 `schema.prisma` 生成的 JS，不会进 git。
+> 任何机器 clone 后必须 `npm run db:generate` 一次，否则会报
+> `@prisma/client did not initialize yet`。
+>
+> `DATABASE_URL` 在 monorepo 根 `.env`。`packages/db/` 自身不再放 .env，
+> 避免 Prisma 5 报「conflicting env vars」。
+
+---
+
+## 6. 非目标（v0.1 不做）
 
 - 非 CoC TRPG 规则适配（仅 7e 基线，规则书校准前数值表先占位）
 - 语音 / 视频通话
@@ -83,7 +115,7 @@
 
 ---
 
-## 6. 待校准（需规则书）
+## 7. 待校准（需规则书）
 
 下列数值 / 表先按 CoC 7e 基线占位，等用户补规则书后核对：
 
