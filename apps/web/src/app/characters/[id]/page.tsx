@@ -42,7 +42,7 @@ export default async function CharacterDetailPage({ params }: { params: Promise<
 
         <section className="card">
           <h2 className="font-bold mb-3">属性</h2>
-          <div className="grid grid-cols-3 gap-2 text-sm">
+          <div className="flex flex-col gap-1 text-sm">
             <div>STR <b>{c.str}</b></div>
             <div>CON <b>{c.con}</b></div>
             <div>SIZ <b>{c.siz}</b></div>
