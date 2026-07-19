@@ -87,6 +87,18 @@ body {
   @apply text-sm text-red-300 mt-1;
 }
 
+/* ---------- 下拉菜单 ---------- */
+/* 原生 <option> 弹层由系统绘制，.input 的玻璃面板样式不一定生效，
+   这里显式指定深色背景 + 浅色文字，避免白底白字看不清。 */
+select option {
+  background-color: #1e293b; /* ink-800 */
+  color: #f1f5f9;            /* ink-100 */
+}
+select option:checked {
+  background-color: #312e81; /* indigo-900 作为高亮 */
+  color: #f1f5f9;
+}
+
 /* ---------- 无障碍 ---------- */
 :where(button, a, input, select, textarea):focus-visible {
   @apply outline-none ring-2 ring-brand-500/50;

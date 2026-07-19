@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { TopNav } from '@/components/TopNav';
 
 export const metadata: Metadata = {
   title: 'Coc-tools · 在线跑团工具',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh">
-      <body>{children}</body>
+      <body>
+        <TopNav />
+        {children}
+      </body>
     </html>
   );
 }

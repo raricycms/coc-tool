@@ -41,16 +41,6 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen px-4 py-8 max-w-7xl mx-auto">
-      <header className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">Coc-tools</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-ink-100/60 text-sm">@{user.username}</span>
-          <form action="/api/auth/logout" method="POST">
-            <button type="submit" className="btn-ghost text-sm">退出</button>
-          </form>
-        </div>
-      </header>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <section className="card">
           <header className="flex items-center justify-between mb-3">
