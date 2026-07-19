@@ -11,15 +11,24 @@ interface CaptchaEntry {
   expiresAt: number;
 }
 
-const store = new Map<string, CaptchaEntry>();
+const globalForCaptcha = globalThis as unknown as {
+  cocToolsCaptchaStore: Map<string, CaptchaEntry> | undefined;
+  cocToolsCaptchaCleanup: ReturnType<typeof setInterval> | undefined;
+};
 
-// 周期性清理过期
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of store) {
-    if (v.expiresAt < now) store.delete(k);
-  }
-}, 60_000).unref();
+const store = globalForCaptcha.cocToolsCaptchaStore ?? new Map<string, CaptchaEntry>();
+globalForCaptcha.cocToolsCaptchaStore = store;
+
+// 周期性清理过期；多个 Next.js 路由 bundle 共用同一个 store 和定时器
+if (!globalForCaptcha.cocToolsCaptchaCleanup) {
+  globalForCaptcha.cocToolsCaptchaCleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of store) {
+      if (v.expiresAt < now) store.delete(k);
+    }
+  }, 60_000);
+  globalForCaptcha.cocToolsCaptchaCleanup.unref();
+}
 
 function randDigits(n: number): string {
   let s = '';

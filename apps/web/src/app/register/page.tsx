@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { RegisterInput } from '@coc-tools/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CaptchaBox } from '@/components/CaptchaBox';
@@ -26,10 +27,17 @@ export default function RegisterPage() {
       return;
     }
     setLoading(true);
+    const body = {
+      username,
+      email: email || undefined,
+      password,
+      captchaToken: captcha.token,
+      captchaAnswer: captcha.answer,
+    } satisfies RegisterInput;
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email: email || undefined, password, ...captcha }),
+      body: JSON.stringify(body),
     });
     setLoading(false);
     const j = await res.json();

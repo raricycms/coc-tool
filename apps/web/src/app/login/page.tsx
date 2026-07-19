@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import type { LoginInput } from '@coc-tools/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CaptchaBox } from '@/components/CaptchaBox';
@@ -21,10 +22,16 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
+    const body = {
+      username,
+      password,
+      captchaToken: captcha.token,
+      captchaAnswer: captcha.answer,
+    } satisfies LoginInput;
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, ...captcha }),
+      body: JSON.stringify(body),
     });
     setLoading(false);
     const j = await res.json();
