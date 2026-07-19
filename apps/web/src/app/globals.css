@@ -6,44 +6,95 @@
   color-scheme: dark;
 }
 
-html, body {
-  background: #0f172a;
+html,
+body {
+  /* 深蓝石板底 + 两处柔和的紫/靛光晕，让毛玻璃面板浮起来 */
+  background:
+    radial-gradient(1100px 600px at 12% -12%, rgba(124, 58, 237, 0.20), transparent 60%),
+    radial-gradient(1000px 700px at 112% 8%, rgba(56, 78, 140, 0.22), transparent 55%),
+    #0b1020;
+  background-attachment: fixed;
   color: #f1f5f9;
   font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ---------- 按钮 ---------- */
 .btn {
-  @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition-colors;
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 font-medium transition duration-150;
 }
 
 .btn-primary {
-  @apply btn bg-brand-600 hover:bg-brand-700 text-white;
+  @apply btn text-white;
+  background-image: linear-gradient(135deg, #7c3aed, #6d28d9);
+  box-shadow: 0 8px 24px -10px rgba(124, 58, 237, 0.7);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn-primary:disabled {
+  @apply opacity-40;
 }
 
 .btn-ghost {
-  @apply btn bg-ink-800 hover:bg-ink-700 text-ink-100;
+  @apply btn border border-white/10 bg-white/[0.05] text-ink-100 backdrop-blur-sm;
+}
+.btn-ghost:hover:not(:disabled) {
+  @apply bg-white/[0.1] border-white/20;
+}
+.btn-ghost:disabled {
+  @apply opacity-40;
 }
 
 .btn-danger {
-  @apply btn bg-red-600 hover:bg-red-700 text-white;
+  @apply btn border border-red-500/30 bg-red-500/15 text-red-200 backdrop-blur-sm;
+}
+.btn-danger:hover:not(:disabled) {
+  @apply bg-red-500/25 border-red-500/50;
 }
 
+/* ---------- 输入框 ---------- */
 .input {
-  @apply w-full rounded-md border border-ink-800 bg-ink-900 px-3 py-2 text-ink-100 placeholder-ink-100/40 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[15px] text-ink-100 placeholder-ink-100/35 backdrop-blur-sm transition duration-150;
+}
+.input:focus {
+  @apply border-brand-500/70 bg-white/[0.07] outline-none ring-2 ring-brand-500/30;
 }
 
 .input-error {
-  @apply border-red-500 focus:border-red-500 focus:ring-red-500;
+  @apply border-red-500/70 focus:border-red-500/70 focus:ring-red-500/30;
 }
 
+/* ---------- 卡片 / 玻璃面板 ---------- */
 .card {
-  @apply rounded-lg border border-ink-800 bg-ink-900/50 p-4;
+  @apply rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 24px 48px -28px rgba(0, 0, 0, 0.85);
 }
 
+/* 卡片内部再嵌一层更淡的分区，用于「添加技能/装备」等小面板 */
+.subpanel {
+  @apply rounded-xl border border-white/10 bg-white/[0.02] p-3.5;
+}
+
+/* ---------- 文字 ---------- */
 .label {
-  @apply block text-sm font-medium text-ink-100 mb-1;
+  @apply block text-sm font-medium text-ink-100/80 mb-1.5;
 }
 
 .error-text {
-  @apply text-sm text-red-400 mt-1;
+  @apply text-sm text-red-300 mt-1;
+}
+
+/* ---------- 无障碍 ---------- */
+:where(button, a, input, select, textarea):focus-visible {
+  @apply outline-none ring-2 ring-brand-500/50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

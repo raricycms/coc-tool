@@ -1,11 +1,14 @@
-import { NextRequest } from 'next/server';
-import { ok, handleError } from '@/lib/api';
+import { NextRequest, NextResponse } from 'next/server';
+import { handleError } from '@/lib/api';
 import { clearSession } from '@/lib/auth';
 
-export async function POST(_req: NextRequest) {
+// 退出后跳转到主页 /（避免停留在 JSON 响应页面）
+const HOME_URL = '/';
+
+export async function POST(req: NextRequest) {
   try {
     await clearSession();
-    return ok({});
+    return NextResponse.redirect(new URL(HOME_URL, req.url), { status: 303 });
   } catch (e) {
     return handleError(e);
   }

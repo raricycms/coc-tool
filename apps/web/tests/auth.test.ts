@@ -58,12 +58,12 @@ describe('auth integration', () => {
     expect(user?.email).toBe('alice@test.local');
     expect(user?.passwordHash).toMatch(/^scrypt\$/);
 
-    // 2) 登出
+    // 2) 登出：服务端应 303 重定向到主页（避免停留在 JSON 响应）
     const out = await callRoute(logoutRoute.POST, {
       url: 'http://localhost/api/auth/logout',
       method: 'POST',
     });
-    expect(out.status).toBe(200);
+    expect(out.status).toBe(303);
 
     // 3) 用错密码登录
     const c2 = createCaptcha();

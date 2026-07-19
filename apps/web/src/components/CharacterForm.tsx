@@ -107,10 +107,26 @@ export function CharacterForm() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <div key={s} className={`px-3 py-1 rounded ${step >= s ? 'bg-brand-600' : 'bg-ink-800 text-ink-100/40'}`}>
-            {s}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {[
+          { n: 1, label: '基础' },
+          { n: 2, label: '属性' },
+          { n: 3, label: '技能' },
+          { n: 4, label: '装备' },
+          { n: 5, label: '背景' },
+        ].map(({ n, label }) => (
+          <div
+            key={n}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-sm transition ${
+              step === n
+                ? 'border-brand-500/50 bg-brand-600/90 text-white shadow-[0_8px_24px_-12px_rgba(124,58,237,0.8)]'
+                : step > n
+                  ? 'border-white/10 bg-white/[0.06] text-ink-100/70'
+                  : 'border-white/10 bg-white/[0.02] text-ink-100/40'
+            }`}
+          >
+            <span className="font-semibold">{n}</span>
+            <span className="hidden sm:inline">{label}</span>
           </div>
         ))}
       </div>
@@ -208,16 +224,21 @@ export function CharacterForm() {
               </div>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input className="input flex-1" placeholder="技能名" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
-            <input type="number" className="input w-24" placeholder="值" value={newSkill.value} min={0} max={100}
-              onChange={(e) => setNewSkill({ ...newSkill, value: parseInt(e.target.value) || 0 })} />
-            <button type="button" className="btn-ghost" onClick={() => {
-              if (newSkill.name) {
-                setSkills([...skills, newSkill]);
-                setNewSkill({ name: '', value: 50 });
-              }
-            }}>+</button>
+          <div className="subpanel">
+            <p className="label mb-2">添加技能</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input className="input sm:flex-1" placeholder="技能名称" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
+              <div className="flex gap-2">
+                <input type="number" className="input w-24 sm:w-28" placeholder="初始值" value={newSkill.value} min={0} max={100}
+                  onChange={(e) => setNewSkill({ ...newSkill, value: parseInt(e.target.value) || 0 })} />
+                <button type="button" className="btn-primary flex-1 whitespace-nowrap sm:flex-none" onClick={() => {
+                  if (newSkill.name) {
+                    setSkills([...skills, newSkill]);
+                    setNewSkill({ name: '', value: 50 });
+                  }
+                }}>+ 添加</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -232,18 +253,21 @@ export function CharacterForm() {
                 <button type="button" className="btn-ghost text-xs px-2 py-1" onClick={() => setWeapons(weapons.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
-            <div className="grid grid-cols-4 gap-2">
-              <input className="input" placeholder="武器名" value={newWeapon.name} onChange={(e) => setNewWeapon({ ...newWeapon, name: e.target.value })} />
-              <input className="input" placeholder="技能" value={newWeapon.skill} onChange={(e) => setNewWeapon({ ...newWeapon, skill: e.target.value })} />
-              <input className="input" placeholder="伤害" value={newWeapon.damage} onChange={(e) => setNewWeapon({ ...newWeapon, damage: e.target.value })} />
-              <input className="input" placeholder="射程" value={newWeapon.range} onChange={(e) => setNewWeapon({ ...newWeapon, range: e.target.value })} />
+            <div className="subpanel space-y-2">
+              <p className="label mb-0">添加武器</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <input className="input" placeholder="武器名称" value={newWeapon.name} onChange={(e) => setNewWeapon({ ...newWeapon, name: e.target.value })} />
+                <input className="input" placeholder="使用技能" value={newWeapon.skill} onChange={(e) => setNewWeapon({ ...newWeapon, skill: e.target.value })} />
+                <input className="input" placeholder="伤害" value={newWeapon.damage} onChange={(e) => setNewWeapon({ ...newWeapon, damage: e.target.value })} />
+                <input className="input" placeholder="射程（可选）" value={newWeapon.range} onChange={(e) => setNewWeapon({ ...newWeapon, range: e.target.value })} />
+              </div>
+              <button type="button" className="btn-primary w-full sm:w-auto" onClick={() => {
+                if (newWeapon.name) {
+                  setWeapons([...weapons, newWeapon]);
+                  setNewWeapon({ name: '', skill: '', damage: '', range: '' });
+                }
+              }}>+ 添加武器</button>
             </div>
-            <button type="button" className="btn-ghost" onClick={() => {
-              if (newWeapon.name) {
-                setWeapons([...weapons, newWeapon]);
-                setNewWeapon({ name: '', skill: '', damage: '', range: '' });
-              }
-            }}>+ 添加武器</button>
           </div>
 
           <div className="card space-y-3">
@@ -254,16 +278,21 @@ export function CharacterForm() {
                 <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setEquipment(equipment.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
-            <div className="flex gap-2">
-              <input className="input flex-1" placeholder="装备名" value={newEquip.name} onChange={(e) => setNewEquip({ ...newEquip, name: e.target.value })} />
-              <input type="number" className="input w-24" placeholder="数量" value={newEquip.quantity} min={1}
-                onChange={(e) => setNewEquip({ ...newEquip, quantity: parseInt(e.target.value) || 1 })} />
-              <button type="button" className="btn-ghost" onClick={() => {
-                if (newEquip.name) {
-                  setEquipment([...equipment, newEquip]);
-                  setNewEquip({ name: '', quantity: 1 });
-                }
-              }}>+</button>
+            <div className="subpanel">
+              <p className="label mb-2">添加装备</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input className="input sm:flex-1" placeholder="装备名称" value={newEquip.name} onChange={(e) => setNewEquip({ ...newEquip, name: e.target.value })} />
+                <div className="flex gap-2">
+                  <input type="number" className="input w-24 sm:w-28" placeholder="数量" value={newEquip.quantity} min={1}
+                    onChange={(e) => setNewEquip({ ...newEquip, quantity: parseInt(e.target.value) || 1 })} />
+                  <button type="button" className="btn-primary flex-1 whitespace-nowrap sm:flex-none" onClick={() => {
+                    if (newEquip.name) {
+                      setEquipment([...equipment, newEquip]);
+                      setNewEquip({ name: '', quantity: 1 });
+                    }
+                  }}>+ 添加</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
