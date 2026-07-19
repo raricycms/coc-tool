@@ -128,6 +128,7 @@ npm run dev:realtime
 
 ## 文档
 
+- [部署指南](docs/deployment.md)
 - [项目总览与术语](docs/plan/00-README.md)
 - [技术栈与决策](docs/plan/01-tech-stack.md)
 - [系统架构](docs/plan/02-architecture.md)

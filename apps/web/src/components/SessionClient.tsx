@@ -49,74 +49,85 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   const [oocMessages, setOocMessages] = useState<OOCMessage[]>([]);
   const [icMessages, setIcMessages] = useState<ICMessage[]>([]);
   const [pendingJudgments, setPendingJudgments] = useState<JudgmentCreatedEvent[]>([]);
-  const socketRef = useRef<ReturnType<typeof getSocket> | null>(null);
+  const socketRef = useRef<Awaited<ReturnType<typeof getSocket>> | null>(null);
 
   const me = members.find((m) => m.userId === currentUserId);
 
   // 连接 WS
   useEffect(() => {
-    const socket = getSocket();
-    socketRef.current = socket;
+    let cancelled = false;
+    let socket: Awaited<ReturnType<typeof getSocket>> | null = null;
 
-    const onConnect = () => {
-      setConnected(true);
-      socket.emit(SOCKET_EVENTS.JOIN_SESSION, { sessionId });
-      socket.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId });
-    };
-    const onDisconnect = () => setConnected(false);
+    getSocket().then((s) => {
+      if (cancelled) {
+        s.disconnect();
+        return;
+      }
+      socket = s;
+      socketRef.current = s;
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    if (socket.connected) onConnect();
+      const onConnect = () => {
+        setConnected(true);
+        s.emit(SOCKET_EVENTS.JOIN_SESSION, { sessionId });
+        s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId });
+      };
+      const onDisconnect = () => setConnected(false);
 
-    socket.on(SOCKET_EVENTS.OOC_MESSAGE, (m: OOCMessage) => {
-      setOocMessages((prev) => [...prev, m]);
-    });
-    socket.on(SOCKET_EVENTS.IC_MESSAGE, (m: ICMessage) => {
-      setIcMessages((prev) => [...prev, m]);
-    });
-    socket.on(SOCKET_EVENTS.LOG_ENTRY, (e: LogEntryPayload) => {
-      setLogs((prev) => [...prev, e].slice(-500));
-    });
-    socket.on(SOCKET_EVENTS.LOG_HISTORY_RES, ({ entries }: { entries: any[] }) => {
-      const parsed = entries.map((e) => ({
-        ...e,
-        payload: typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload,
-        realTime: e.realTime,
-        createdAt: e.createdAt,
-      }));
-      setLogs(parsed);
-    });
-    socket.on(SOCKET_EVENTS.JUDGMENT_CREATED, (j: JudgmentCreatedEvent) => {
-      setPendingJudgments((prev) => [...prev, j]);
-    });
-    socket.on(SOCKET_EVENTS.JUDGMENT_RESULT, (j: JudgmentResultEvent) => {
-      setPendingJudgments((prev) => prev.filter((p) => p.id !== j.id));
-    });
-    socket.on(SOCKET_EVENTS.JUDGMENT_CANCELLED, ({ id }: { id: string }) => {
-      setPendingJudgments((prev) => prev.filter((p) => p.id !== id));
-    });
-    socket.on(SOCKET_EVENTS.CLOCK_STATE, (c: ClockStateEvent) => {
-      setClock({ inGameTime: c.inGameTime, inGameDate: c.inGameDate, running: c.running, rate: c.rate });
-    });
-    socket.on(SOCKET_EVENTS.PRESENCE_UPDATE, (p: PresenceUpdate) => {
-      // 合并：existing member 取最新名字
-      setMembers((prev) => p.members.map((m) => {
-        const old = prev.find((x) => x.userId === m.userId);
-        return {
-          userId: m.userId,
-          username: m.username,
-          avatar: m.avatar,
-          role: m.role,
-          characterId: m.characterId,
-          character: old?.character,
-        };
-      }));
+      s.on('connect', onConnect);
+      s.on('disconnect', onDisconnect);
+      if (s.connected) onConnect();
+
+      s.on(SOCKET_EVENTS.OOC_MESSAGE, (m: OOCMessage) => {
+        setOocMessages((prev) => [...prev, m]);
+      });
+      s.on(SOCKET_EVENTS.IC_MESSAGE, (m: ICMessage) => {
+        setIcMessages((prev) => [...prev, m]);
+      });
+      s.on(SOCKET_EVENTS.LOG_ENTRY, (e: LogEntryPayload) => {
+        setLogs((prev) => [...prev, e].slice(-500));
+      });
+      s.on(SOCKET_EVENTS.LOG_HISTORY_RES, ({ entries }: { entries: any[] }) => {
+        const parsed = entries.map((e) => ({
+          ...e,
+          payload: typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload,
+          realTime: e.realTime,
+          createdAt: e.createdAt,
+        }));
+        setLogs(parsed);
+      });
+      s.on(SOCKET_EVENTS.JUDGMENT_CREATED, (j: JudgmentCreatedEvent) => {
+        setPendingJudgments((prev) => [...prev, j]);
+      });
+      s.on(SOCKET_EVENTS.JUDGMENT_RESULT, (j: JudgmentResultEvent) => {
+        setPendingJudgments((prev) => prev.filter((p) => p.id !== j.id));
+      });
+      s.on(SOCKET_EVENTS.JUDGMENT_CANCELLED, ({ id }: { id: string }) => {
+        setPendingJudgments((prev) => prev.filter((p) => p.id !== id));
+      });
+      s.on(SOCKET_EVENTS.CLOCK_STATE, (c: ClockStateEvent) => {
+        setClock({ inGameTime: c.inGameTime, inGameDate: c.inGameDate, running: c.running, rate: c.rate });
+      });
+      s.on(SOCKET_EVENTS.PRESENCE_UPDATE, (p: PresenceUpdate) => {
+        // 合并：existing member 取最新名字
+        setMembers((prev) => p.members.map((m) => {
+          const old = prev.find((x) => x.userId === m.userId);
+          return {
+            userId: m.userId,
+            username: m.username,
+            avatar: m.avatar,
+            role: m.role,
+            characterId: m.characterId,
+            character: old?.character,
+          };
+        }));
+      });
     });
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
+      cancelled = true;
+      if (!socket) return;
+      socket.off('connect');
+      socket.off('disconnect');
       socket.off(SOCKET_EVENTS.OOC_MESSAGE);
       socket.off(SOCKET_EVENTS.IC_MESSAGE);
       socket.off(SOCKET_EVENTS.LOG_ENTRY);
