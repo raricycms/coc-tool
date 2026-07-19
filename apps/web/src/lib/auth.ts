@@ -10,6 +10,17 @@ const SECRET = () => new TextEncoder().encode(process.env.SESSION_SECRET || 'dev
 const COOKIE_NAME = 'session';
 const COOKIE_MAX_AGE = 7 * 24 * 3600;
 
+/**
+ * 只有站点确实以 HTTPS 对外提供服务时，才给 Cookie 加 Secure 标记。
+ * 浏览器会「静默丢弃」通过明文 HTTP 收到的 Secure Cookie，
+ * 因此用 NODE_ENV 判断会导致「生产 + HTTP」部署无法保存登录状态。
+ * 以 WEB_ORIGIN 的协议为准更准确：https 才 Secure，http 则不加。
+ * 导出以便其它路由（如 OAuth state）复用，保持 Cookie 策略一致。
+ */
+export function cookieSecure(): boolean {
+  return (process.env.WEB_ORIGIN ?? '').startsWith('https://');
+}
+
 export interface SessionPayload {
   userId: string;
   username: string;
@@ -25,7 +36,7 @@ export async function issueSession(userId: string, username: string, role: strin
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, jwt, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     sameSite: 'lax',
     path: '/',
     maxAge: COOKIE_MAX_AGE,

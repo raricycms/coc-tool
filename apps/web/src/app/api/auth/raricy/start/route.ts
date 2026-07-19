@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 import { fail, handleError } from '@/lib/api';
+import { cookieSecure } from '@/lib/auth';
 
 export async function GET(_req: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(_req: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set('oauth_state', state, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: cookieSecure(),
       sameSite: 'lax',
       path: '/',
       maxAge: 600,
