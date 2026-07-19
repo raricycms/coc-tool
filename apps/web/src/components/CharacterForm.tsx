@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DEFAULT_SKILLS, rollDie } from '@coc-tools/coc-rules';
+import { useFieldErrors } from '@/lib/useFieldErrors';
+import { FieldError } from './FieldError';
 
 type PrimaryStats = {
   str: number; con: number; siz: number; dex: number;
@@ -32,6 +34,7 @@ function rollPrimary(): PrimaryStats {
 
 export function CharacterForm() {
   const router = useRouter();
+  const { get, apply, clear, clearAll } = useFieldErrors();
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
@@ -55,24 +58,47 @@ export function CharacterForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const randomPrimary = () => setPrimary(rollPrimary());
+  const randomPrimary = () => {
+    setPrimary(rollPrimary());
+    // 随机生成后旧属性错误已无关，清掉
+    for (const k of ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const) {
+      clear(`primary.${k}`);
+    }
+  };
+
+  // 母语 = EDU（CoC 7e 规则）。当 EDU 变化时同步更新母语技能值。
+  useEffect(() => {
+    setSkills((prev) =>
+      prev.map((s) => (s.name === '母语' ? { ...s, value: primary.edu } : s)),
+    );
+  }, [primary.edu]);
 
   const submit = async () => {
     setError(null);
+    clearAll();
     setLoading(true);
+    const body = {
+      name, gender: gender || undefined, age, birthplace, residence,
+      nationality, occupation, era, primary, skills, weapons, equipment,
+      background, notes,
+    };
     const res = await fetch('/api/characters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, gender: gender || undefined, age, birthplace, residence,
-        nationality, occupation, era, primary, skills, weapons, equipment,
-        background, notes,
-      }),
+      body: JSON.stringify(body),
     });
     setLoading(false);
     const j = await res.json();
     if (!j.ok) {
-      setError(j.error?.message || '创建失败');
+      // 字段级错误 → 标红；非字段错误（captcha、429 等）→ 顶部错误条
+      if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields);
+        // 跳到第一个出错的 step
+        const firstStep = stepForPath(j.error.fields[0].path);
+        if (firstStep) setStep(firstStep);
+      } else {
+        setError(j.error?.message || '创建失败');
+      }
       return;
     }
     router.push(`/characters/${j.data.id}`);
@@ -92,54 +118,54 @@ export function CharacterForm() {
       {step === 1 && (
         <div className="card space-y-4">
           <h2 className="font-bold">基础信息</h2>
-          <div>
+          <FieldError error={get('name')}>
             <label className="label">姓名 *</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
+            <input className="input" value={name} onChange={(e) => { setName(e.target.value); clear('name'); }} required />
+          </FieldError>
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <FieldError error={get('gender')}>
               <label className="label">性别</label>
-              <select className="input" value={gender} onChange={(e) => setGender(e.target.value as any)}>
+              <select className="input" value={gender} onChange={(e) => { setGender(e.target.value as any); clear('gender'); }}>
                 <option value="">未指定</option>
                 <option value="male">男</option>
                 <option value="female">女</option>
                 <option value="other">其他</option>
               </select>
-            </div>
-            <div>
+            </FieldError>
+            <FieldError error={get('age')}>
               <label className="label">年龄</label>
-              <input type="number" className="input" value={age} min={15} max={90} onChange={(e) => setAge(parseInt(e.target.value))} />
-            </div>
+              <input type="number" className="input" value={age} min={15} max={90} onChange={(e) => { setAge(parseInt(e.target.value)); clear('age'); }} />
+            </FieldError>
           </div>
-          <div>
+          <FieldError error={get('era')}>
             <label className="label">时代 *</label>
-            <select className="input" value={era} onChange={(e) => setEra(e.target.value as any)}>
+            <select className="input" value={era} onChange={(e) => { setEra(e.target.value as any); clear('era'); }}>
               <option value="modern">现代</option>
               <option value="1920s">1920s</option>
               <option value="victorian">维多利亚</option>
               <option value="ancient">古代</option>
               <option value="future">未来</option>
             </select>
-          </div>
+          </FieldError>
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <FieldError error={get('occupation')}>
               <label className="label">职业</label>
-              <input className="input" value={occupation} onChange={(e) => setOccupation(e.target.value)} placeholder="私家侦探 / 记者 / ..." />
-            </div>
-            <div>
+              <input className="input" value={occupation} onChange={(e) => { setOccupation(e.target.value); clear('occupation'); }} placeholder="私家侦探 / 记者 / ..." />
+            </FieldError>
+            <FieldError error={get('nationality')}>
               <label className="label">国籍</label>
-              <input className="input" value={nationality} onChange={(e) => setNationality(e.target.value)} />
-            </div>
+              <input className="input" value={nationality} onChange={(e) => { setNationality(e.target.value); clear('nationality'); }} />
+            </FieldError>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            <FieldError error={get('birthplace')}>
               <label className="label">出生地</label>
-              <input className="input" value={birthplace} onChange={(e) => setBirthplace(e.target.value)} />
-            </div>
-            <div>
+              <input className="input" value={birthplace} onChange={(e) => { setBirthplace(e.target.value); clear('birthplace'); }} />
+            </FieldError>
+            <FieldError error={get('residence')}>
               <label className="label">住址</label>
-              <input className="input" value={residence} onChange={(e) => setResidence(e.target.value)} />
-            </div>
+              <input className="input" value={residence} onChange={(e) => { setResidence(e.target.value); clear('residence'); }} />
+            </FieldError>
           </div>
         </div>
       )}
@@ -152,11 +178,11 @@ export function CharacterForm() {
           </header>
           <div className="grid grid-cols-3 gap-3">
             {(['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const).map((k) => (
-              <div key={k}>
+              <FieldError key={k} error={get(`primary.${k}`)}>
                 <label className="label uppercase">{k}</label>
                 <input type="number" className="input" value={primary[k]} min={1} max={100}
-                  onChange={(e) => setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 })} />
-              </div>
+                  onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }} />
+              </FieldError>
             ))}
           </div>
         </div>
@@ -167,13 +193,18 @@ export function CharacterForm() {
           <h2 className="font-bold">技能</h2>
           <div className="max-h-96 overflow-y-auto space-y-2">
             {skills.map((s, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <span className="flex-1">{s.name}</span>
-                <input type="number" className="input w-20" value={s.value} min={0} max={100}
-                  onChange={(e) => {
-                    const c = [...skills]; c[i] = { ...c[i], value: parseInt(e.target.value) || 0 }; setSkills(c);
-                  }} />
-                <button type="button" className="text-red-400" onClick={() => setSkills(skills.filter((_, j) => j !== i))}>×</button>
+              <div key={i} className="flex gap-2 items-start">
+                <span className="flex-1 pt-2">{s.name}</span>
+                <div className="w-28">
+                  <FieldError error={get(`skills.${i}.value`)}>
+                    <input type="number" className="input" value={s.value} min={0} max={100}
+                      onChange={(e) => {
+                        const c = [...skills]; c[i] = { ...c[i], value: parseInt(e.target.value) || 0 }; setSkills(c);
+                        clear(`skills.${i}.value`);
+                      }} />
+                  </FieldError>
+                </div>
+                <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setSkills(skills.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
           </div>
@@ -198,7 +229,7 @@ export function CharacterForm() {
             {weapons.map((w, i) => (
               <div key={i} className="flex gap-2 text-sm">
                 <span className="flex-1">{w.name} ({w.skill}, {w.damage})</span>
-                <button type="button" className="text-red-400" onClick={() => setWeapons(weapons.filter((_, j) => j !== i))}>×</button>
+                <button type="button" className="btn-ghost text-xs px-2 py-1" onClick={() => setWeapons(weapons.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
             <div className="grid grid-cols-4 gap-2">
@@ -218,9 +249,9 @@ export function CharacterForm() {
           <div className="card space-y-3">
             <h2 className="font-bold">装备</h2>
             {equipment.map((e, i) => (
-              <div key={i} className="flex gap-2 text-sm">
-                <span className="flex-1">{e.name} × {e.quantity}</span>
-                <button type="button" className="text-red-400" onClick={() => setEquipment(equipment.filter((_, j) => j !== i))}>×</button>
+              <div key={i} className="flex gap-2 text-sm items-start">
+                <span className="flex-1 pt-2">{e.name} × {e.quantity}</span>
+                <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setEquipment(equipment.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
             <div className="flex gap-2">
@@ -241,14 +272,14 @@ export function CharacterForm() {
       {step === 5 && (
         <div className="card space-y-4">
           <h2 className="font-bold">背景 & 备注</h2>
-          <div>
+          <FieldError error={get('background')}>
             <label className="label">调查员背景</label>
-            <textarea className="input min-h-[200px]" value={background} onChange={(e) => setBackground(e.target.value)} />
-          </div>
-          <div>
+            <textarea className="input min-h-[200px]" value={background} onChange={(e) => { setBackground(e.target.value); clear('background'); }} />
+          </FieldError>
+          <FieldError error={get('notes')}>
             <label className="label">玩家私有备注</label>
-            <textarea className="input min-h-[100px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+            <textarea className="input min-h-[100px]" value={notes} onChange={(e) => { setNotes(e.target.value); clear('notes'); }} />
+          </FieldError>
         </div>
       )}
 
@@ -266,4 +297,15 @@ export function CharacterForm() {
       </div>
     </div>
   );
+}
+
+/** 根据 issue.path 推断应该跳到哪个 step。 */
+function stepForPath(path: (string | number)[]): number | null {
+  const head = path[0];
+  if (head === 'skills') return 3;
+  if (head === 'weapons' || head === 'equipment') return 4;
+  if (head === 'background' || head === 'notes') return 5;
+  if (head === 'primary') return 2;
+  // name/gender/age/era/occupation/nationality/birthplace/residence → step 1
+  return 1;
 }

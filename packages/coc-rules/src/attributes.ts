@@ -99,7 +99,8 @@ export const DEFAULT_SKILLS: Record<string, number> = {
   '弓术': 15,
   '机枪': 10,
   '重武器': 0,
-  '母语': Math.floor(((Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 6) * 5 * 3)), // 占位（运行时注入）
+  // 母语 = EDU（CoC 7e 规则），不在此处生成；由调用方在创建角色时按 EDU 注入
+  '母语': 0,
   '法律': 5,
   '会计': 5,
   '人类学': 0,
