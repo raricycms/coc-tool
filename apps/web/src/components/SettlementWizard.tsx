@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useFieldErrors, pathToCharacterKey } from '@/lib/useFieldErrors';
+import { FieldError } from './FieldError';
 
 type Step = 'SAN_RECOVERY' | 'KNOWLEDGE_GAIN' | 'RETIREMENT' | 'SKILL_GROWTH' | 'DONE';
 
@@ -26,6 +28,7 @@ interface Props {
 
 export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
   const router = useRouter();
+  const { get, apply, clear, clearAll } = useFieldErrors();
   const [step, setStep] = useState<Step>((initialStep as Step) ?? 'SAN_RECOVERY');
   const [sanRecoveries, setSanRecoveries] = useState<Record<string, number>>({});
   const [knowledgeGains, setKnowledgeGains] = useState<Record<string, number>>({});
@@ -35,47 +38,75 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const submitSan = async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); clearAll();
+    const sanBody = {
+      sanRecoveries: Object.entries(sanRecoveries).map(([characterId, amount]) => ({ characterId, amount })),
+    };
     const res = await fetch(`/api/sessions/${sessionId}/settlement/san-recovery`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sanRecoveries: Object.entries(sanRecoveries).map(([characterId, amount]) => ({ characterId, amount })),
-      }),
+      body: JSON.stringify(sanBody),
     });
     setLoading(false);
-    if (!res.ok) { setError('SAN 恢复失败'); return; }
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      if (Array.isArray(j?.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields, pathToCharacterKey(sanBody));
+      } else {
+        setError(j?.error?.message || 'SAN 恢复失败');
+      }
+      return;
+    }
     setStep('KNOWLEDGE_GAIN');
   };
 
   const submitKnowledge = async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); clearAll();
+    const knowledgeBody = {
+      knowledgeGains: Object.entries(knowledgeGains).map(([characterId, amount]) => ({ characterId, amount })),
+    };
     const res = await fetch(`/api/sessions/${sessionId}/settlement/knowledge`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        knowledgeGains: Object.entries(knowledgeGains).map(([characterId, amount]) => ({ characterId, amount })),
-      }),
+      body: JSON.stringify(knowledgeBody),
     });
     setLoading(false);
-    if (!res.ok) { setError('Mythos 增长失败'); return; }
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      if (Array.isArray(j?.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields, pathToCharacterKey(knowledgeBody));
+      } else {
+        setError(j?.error?.message || 'Mythos 增长失败');
+      }
+      return;
+    }
     setStep('RETIREMENT');
   };
 
   const submitRetirements = async () => {
-    setLoading(true); setError(null);
-    const list = Object.entries(retirements)
-      .filter(([, reason]) => reason)
-      .map(([characterId, reason]) => ({ characterId, reason: reason as any }));
+    setLoading(true); setError(null); clearAll();
+    const retirementBody = {
+      retirements: Object.entries(retirements)
+        .filter(([, reason]) => reason)
+        .map(([characterId, reason]) => ({ characterId, reason: reason as any })),
+    };
     const res = await fetch(`/api/sessions/${sessionId}/settlement/retirements`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ retirements: list }),
+      body: JSON.stringify(retirementBody),
     });
     setLoading(false);
-    if (!res.ok) { setError('撕卡失败'); return; }
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      if (Array.isArray(j?.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields, pathToCharacterKey(retirementBody));
+      } else {
+        setError(j?.error?.message || '撕卡失败');
+      }
+      return;
+    }
     setStep('SKILL_GROWTH');
   };
 
   const submitSkillGrowth = async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); clearAll();
     const growths: Array<{ characterId: string; skillName: string }> = [];
     for (const [characterId, skills] of Object.entries(skillSelections)) {
       for (const s of skills) growths.push({ characterId, skillName: s });
@@ -85,12 +116,21 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
       submitComplete();
       return;
     }
+    const growthBody = { growths };
     const res = await fetch(`/api/sessions/${sessionId}/settlement/skill-growth`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ growths }),
+      body: JSON.stringify(growthBody),
     });
     setLoading(false);
-    if (!res.ok) { setError('技能成长投骰失败'); return; }
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      if (Array.isArray(j?.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields, pathToCharacterKey(growthBody));
+      } else {
+        setError(j?.error?.message || '技能成长投骰失败');
+      }
+      return;
+    }
     setStep('DONE');
   };
 
@@ -120,11 +160,13 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
                 <div className="font-medium">{pc.characterName}</div>
                 <div className="text-xs text-ink-100/40">SAN {pc.sanCurrent}/{pc.sanMax}</div>
               </div>
-              <input
-                type="number" className="input w-24"
-                value={sanRecoveries[pc.characterId] ?? 0}
-                onChange={(e) => setSanRecoveries({ ...sanRecoveries, [pc.characterId]: parseInt(e.target.value) || 0 })}
-              />
+              <FieldError error={get(`amount:${pc.characterId}`)}>
+                <input
+                  type="number" className="input w-24"
+                  value={sanRecoveries[pc.characterId] ?? 0}
+                  onChange={(e) => { setSanRecoveries({ ...sanRecoveries, [pc.characterId]: parseInt(e.target.value) || 0 }); clear(`amount:${pc.characterId}`); }}
+                />
+              </FieldError>
             </div>
           ))}
           <button className="btn-primary w-full" onClick={submitSan} disabled={loading}>下一步：神话知识</button>
@@ -141,11 +183,13 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
                 <div className="font-medium">{pc.characterName}</div>
                 <div className="text-xs text-ink-100/40">当前 Mythos: {pc.mythos}</div>
               </div>
-              <input
-                type="number" className="input w-24" min={0} max={20}
-                value={knowledgeGains[pc.characterId] ?? 0}
-                onChange={(e) => setKnowledgeGains({ ...knowledgeGains, [pc.characterId]: parseInt(e.target.value) || 0 })}
-              />
+              <FieldError error={get(`amount:${pc.characterId}`)}>
+                <input
+                  type="number" className="input w-24" min={0} max={20}
+                  value={knowledgeGains[pc.characterId] ?? 0}
+                  onChange={(e) => { setKnowledgeGains({ ...knowledgeGains, [pc.characterId]: parseInt(e.target.value) || 0 }); clear(`amount:${pc.characterId}`); }}
+                />
+              </FieldError>
             </div>
           ))}
           <button className="btn-primary w-full" onClick={submitKnowledge} disabled={loading}>下一步：撕卡</button>
@@ -161,16 +205,18 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
                 <div className="font-medium">{pc.characterName}</div>
                 {pc.retired && <div className="text-xs text-red-400">⚰ 已撕卡</div>}
               </div>
-              <select
-                className="input w-40"
-                value={retirements[pc.characterId] ?? ''}
-                onChange={(e) => setRetirements({ ...retirements, [pc.characterId]: e.target.value as any })}
-              >
-                <option value="">-</option>
-                <option value="dead">死亡</option>
-                <option value="asylum">永久疯狂</option>
-                <option value="user_request">主动退出</option>
-              </select>
+              <FieldError error={get(`reason:${pc.characterId}`)}>
+                <select
+                  className="input w-40"
+                  value={retirements[pc.characterId] ?? ''}
+                  onChange={(e) => { setRetirements({ ...retirements, [pc.characterId]: e.target.value as any }); clear(`reason:${pc.characterId}`); }}
+                >
+                  <option value="">-</option>
+                  <option value="dead">死亡</option>
+                  <option value="asylum">永久疯狂</option>
+                  <option value="user_request">主动退出</option>
+                </select>
+              </FieldError>
             </div>
           ))}
           <button className="btn-primary w-full" onClick={submitRetirements} disabled={loading}>下一步：技能成长</button>

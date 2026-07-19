@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useFieldErrors } from '@/lib/useFieldErrors';
+import { FieldError } from './FieldError';
 
 interface Props {
   recruitmentId: string;
@@ -11,6 +13,7 @@ interface Props {
 
 export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
   const router = useRouter();
+  const { get, apply, clear, clearAll } = useFieldErrors();
   const [open, setOpen] = useState(false);
   const [characterId, setCharacterId] = useState(myCharacters[0]?.id ?? '');
   const [message, setMessage] = useState('');
@@ -25,6 +28,7 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
 
   const submit = async () => {
     setError(null);
+    clearAll();
     setLoading(true);
     const res = await fetch(`/api/recruitments/${recruitmentId}/applications`, {
       method: 'POST',
@@ -34,7 +38,11 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
     setLoading(false);
     const j = await res.json();
     if (!j.ok) {
-      setError(j.error?.message || '报名失败');
+      if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields);
+      } else {
+        setError(j.error?.message || '报名失败');
+      }
       return;
     }
     setOpen(false);
@@ -55,18 +63,18 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
 
   return (
     <div className="card space-y-3">
-      <div>
+      <FieldError error={get('characterId')}>
         <label className="label">选择车卡</label>
-        <select className="input" value={characterId} onChange={(e) => setCharacterId(e.target.value)}>
+        <select className="input" value={characterId} onChange={(e) => { setCharacterId(e.target.value); clear('characterId'); }}>
           {myCharacters.map((c) => (
             <option key={c.id} value={c.id}>{c.name} ({c.era})</option>
           ))}
         </select>
-      </div>
-      <div>
+      </FieldError>
+      <FieldError error={get('message')}>
         <label className="label">留言（可选）</label>
-        <textarea className="input" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
-      </div>
+        <textarea className="input" value={message} onChange={(e) => { setMessage(e.target.value); clear('message'); }} maxLength={2000} />
+      </FieldError>
       {error && <p className="error-text">{error}</p>}
       <div className="flex gap-2 justify-end">
         <button className="btn-ghost" onClick={() => setOpen(false)}>取消</button>

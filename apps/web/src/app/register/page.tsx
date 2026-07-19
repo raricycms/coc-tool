@@ -5,9 +5,12 @@ import type { RegisterInput } from '@coc-tools/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CaptchaBox } from '@/components/CaptchaBox';
+import { useFieldErrors } from '@/lib/useFieldErrors';
+import { FieldError } from '@/components/FieldError';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { get, apply, clear, clearAll } = useFieldErrors();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +21,7 @@ export default function RegisterPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    clearAll();
     if (!captcha.token || !captcha.answer) {
       setError('请输入验证码');
       return;
@@ -42,7 +46,11 @@ export default function RegisterPage() {
     setLoading(false);
     const j = await res.json();
     if (!j.ok) {
-      setError(j.error?.message || '注册失败');
+      if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields);
+      } else {
+        setError(j.error?.message || '注册失败');
+      }
       return;
     }
     router.push('/dashboard');
@@ -65,18 +73,18 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={submit} className="space-y-4">
-          <div>
+          <FieldError error={get('username')}>
             <label className="label">用户名（3-20 字符）</label>
-            <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} maxLength={20} autoComplete="username" />
-          </div>
-          <div>
+            <input className="input" value={username} onChange={(e) => { setUsername(e.target.value); clear('username'); }} required minLength={3} maxLength={20} autoComplete="username" />
+          </FieldError>
+          <FieldError error={get('email')}>
             <label className="label">邮箱（可选）</label>
-            <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-          </div>
-          <div>
+            <input type="email" className="input" value={email} onChange={(e) => { setEmail(e.target.value); clear('email'); }} autoComplete="email" />
+          </FieldError>
+          <FieldError error={get('password')}>
             <label className="label">密码（至少 10 位）</label>
-            <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={10} autoComplete="new-password" />
-          </div>
+            <input type="password" className="input" value={password} onChange={(e) => { setPassword(e.target.value); clear('password'); }} required minLength={10} autoComplete="new-password" />
+          </FieldError>
           <div>
             <label className="label">验证码</label>
             <CaptchaBox onChange={setCaptcha} />

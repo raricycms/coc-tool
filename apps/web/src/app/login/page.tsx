@@ -5,9 +5,12 @@ import type { LoginInput } from '@coc-tools/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CaptchaBox } from '@/components/CaptchaBox';
+import { useFieldErrors } from '@/lib/useFieldErrors';
+import { FieldError } from '@/components/FieldError';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { get, apply, clear, clearAll } = useFieldErrors();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [captcha, setCaptcha] = useState({ token: '', answer: '' });
@@ -17,6 +20,7 @@ export default function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    clearAll();
     if (!captcha.token || !captcha.answer) {
       setError('请输入验证码');
       return;
@@ -36,7 +40,11 @@ export default function LoginPage() {
     setLoading(false);
     const j = await res.json();
     if (!j.ok) {
-      setError(j.error?.message || '登录失败');
+      if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
+        apply(j.error.fields);
+      } else {
+        setError(j.error?.message || '登录失败');
+      }
       return;
     }
     router.push('/dashboard');
@@ -59,14 +67,14 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit} className="space-y-4">
-          <div>
+          <FieldError error={get('username')}>
             <label className="label">用户名</label>
-            <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
-          </div>
-          <div>
+            <input className="input" value={username} onChange={(e) => { setUsername(e.target.value); clear('username'); }} required autoComplete="username" />
+          </FieldError>
+          <FieldError error={get('password')}>
             <label className="label">密码</label>
-            <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-          </div>
+            <input type="password" className="input" value={password} onChange={(e) => { setPassword(e.target.value); clear('password'); }} required autoComplete="current-password" />
+          </FieldError>
           <div>
             <label className="label">验证码</label>
             <CaptchaBox onChange={setCaptcha} />

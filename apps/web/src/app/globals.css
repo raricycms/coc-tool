@@ -32,6 +32,10 @@ html, body {
   @apply w-full rounded-md border border-ink-800 bg-ink-900 px-3 py-2 text-ink-100 placeholder-ink-100/40 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
 }
 
+.input-error {
+  @apply border-red-500 focus:border-red-500 focus:ring-red-500;
+}
+
 .card {
   @apply rounded-lg border border-ink-800 bg-ink-900/50 p-4;
 }
