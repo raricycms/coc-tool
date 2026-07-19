@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition-colors;
+}
+
+.btn-primary {
+  @apply btn bg-brand-600 hover:bg-brand-700 text-white;
+}
+
+.btn-ghost {
+  @apply btn bg-ink-800 hover:bg-ink-700 text-ink-100;
+}
+
+.btn-danger {
+  @apply btn bg-red-600 hover:bg-red-700 text-white;
+}
+
+.input {
+  @apply w-full rounded-md border border-ink-800 bg-ink-900 px-3 py-2 text-ink-100 placeholder-ink-100/40 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+}
+
+.card {
+  @apply rounded-lg border border-ink-800 bg-ink-900/50 p-4;
+}
+
+.label {
+  @apply block text-sm font-medium text-ink-100 mb-1;
+}
+
+.error-text {
+  @apply text-sm text-red-400 mt-1;
+}

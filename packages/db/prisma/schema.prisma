@@ -1,0 +1,346 @@
+// Coc-tools · Prisma schema (SQLite for dev — Postgres in prod)
+// 详细字段含义见 docs/plan/03-database-schema.md
+//
+// 注意：SQLite 不支持 enum / Json，所以相关字段用 String 存。
+// 应用层用 zod 校验取值范围。
+// 切到 Postgres 时把 String 改回 Json/Enum。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── User ─────────────────────────────
+// 字段说明：
+//   provider   : LOCAL | RARICY
+//   status     : ACTIVE | BANNED | DELETED
+
+model User {
+  id              String    @id @default(cuid())
+  email           String?   @unique
+  username        String    @unique
+  avatarUrl       String?
+  passwordHash    String?
+  provider        String    @default("LOCAL")
+  providerSub     String?
+  status          String    @default("ACTIVE")
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+
+  characters      Character[]
+  recruitments    Recruitment[]
+  sessions        Session[]       @relation("KPSessions")
+  memberships     SessionMember[]
+  applications    Application[]
+  oauthTokens     OAuthToken[]
+  captchaVerifies CaptchaVerify[]
+
+  @@unique([provider, providerSub])
+  @@index([status])
+}
+
+// ───────────────────────────── OAuth ─────────────────────────────
+
+model OAuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  scope     String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model CaptchaVerify {
+  id         String    @id @default(cuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  scene      String
+  ip         String
+  verified   Boolean   @default(false)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([ip, scene, createdAt])
+}
+
+// ───────────────────────────── Character ─────────────────────────────
+// status: ACTIVE | RETIRED
+
+model Character {
+  id            String          @id @default(cuid())
+  ownerId       String
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // 基础信息
+  name          String
+  gender        String?
+  age           Int?
+  birthplace    String?
+  residence     String?
+  nationality   String?
+  occupation    String?
+  era           String          @default("modern")
+
+  // 八大属性 + 幸运
+  str           Int
+  con           Int
+  siz           Int
+  dex           Int
+  app           Int
+  int           Int
+  pow           Int
+  edu           Int
+  luck          Int             @default(50)
+
+  // 派生
+  hpMax         Int
+  mpMax         Int
+  sanMax        Int
+  mov           Int
+  build         Int
+  damageBonus   String
+
+  // 当前状态
+  hpCurrent     Int
+  mpCurrent     Int
+  sanCurrent    Int
+  luckCurrent   Int
+
+  // 背景
+  background    String?
+  notes         String?
+  status        String          @default("ACTIVE")
+  retiredReason String?
+  retiredAt     DateTime?
+
+  version       Int             @default(1)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  skills        Skill[]
+  weapons       Weapon[]
+  equipment     Equipment[]
+  members       SessionMember[]
+  judgments     Judgment[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Skill {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  name        String
+  value       Int
+  isMythos    Boolean   @default(false)
+  note        String?
+
+  @@unique([characterId, name])
+  @@index([characterId])
+}
+
+model Weapon {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  name        String
+  skill       String
+  damage      String
+  range       String?
+  ammo        Int?
+  note        String?
+}
+
+model Equipment {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  name        String
+  quantity    Int       @default(1)
+  note        String?
+}
+
+// ───────────────────────────── Recruitment ─────────────────────────────
+// status: DRAFT | OPEN | CLOSED | FINISHED
+
+model Recruitment {
+  id            String           @id @default(cuid())
+  kpId          String
+  kp            User             @relation(fields: [kpId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String
+  scenario      String?
+  minPlayers    Int              @default(3)
+  maxPlayers    Int              @default(5)
+  expectedHours Int?
+  startAt       DateTime?
+  visibility    String           @default("public")
+  status        String           @default("DRAFT")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  finishedAt    DateTime?
+
+  applications  Application[]
+  session       Session?
+
+  @@index([status])
+  @@index([kpId])
+}
+
+// status: PENDING | APPROVED | REJECTED | WITHDRAWN
+
+model Application {
+  id            String            @id @default(cuid())
+  recruitmentId String
+  recruitment   Recruitment       @relation(fields: [recruitmentId], references: [id], onDelete: Cascade)
+  applicantId   String
+  applicant     User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  characterId   String
+  message       String?
+  status        String            @default("PENDING")
+  createdAt     DateTime          @default(now())
+  reviewedAt    DateTime?
+  reviewNote    String?
+
+  @@unique([recruitmentId, characterId])
+  @@index([applicantId])
+}
+
+// ───────────────────────────── Session ─────────────────────────────
+// status: SETUP | RUNNING | PAUSED | SETTLING | FINISHED | ABANDONED
+
+model Session {
+  id            String        @id @default(cuid())
+  recruitmentId String?       @unique
+  recruitment   Recruitment?  @relation(fields: [recruitmentId], references: [id], onDelete: SetNull)
+  kpId          String
+  kp            User          @relation("KPSessions", fields: [kpId], references: [id], onDelete: Cascade)
+  title         String
+  scenario      String?
+  status        String        @default("SETUP")
+  startedAt     DateTime?
+  pausedAt      DateTime?
+  finishedAt    DateTime?
+
+  inGameTime    String?       @default("08:00")
+  inGameDate    String?       @default("1/1")
+  clockRunning  Boolean       @default(false)
+  clockRate     Float         @default(1)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  members       SessionMember[]
+  logs          LogEntry[]
+  judgments     Judgment[]
+  settlement    Settlement?
+
+  @@index([kpId])
+  @@index([status])
+}
+
+// role: KP | PL | SPECTATOR
+
+model SessionMember {
+  id          String            @id @default(cuid())
+  sessionId   String
+  session     Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterId String?
+  character   Character?        @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  role        String
+  joinedAt    DateTime          @default(now())
+  leftAt      DateTime?
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+}
+
+// ───────────────────────────── LogEntry ─────────────────────────────
+// type: CHAT_OOC | CHAT_IC | JUDGMENT | HP_CHANGE | SAN_CHANGE | MP_CHANGE
+//      | SKILL_CHANGE | CLOCK | SYSTEM | CUSTOM
+
+model LogEntry {
+  id          String       @id @default(cuid())
+  sessionId   String
+  session     Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type        String
+  authorId    String?
+  characterId String?
+  judgmentId  String?       @unique
+  judgment    Judgment?     @relation(fields: [judgmentId], references: [id], onDelete: SetNull)
+  payload     String        // JSON serialized
+  realTime    DateTime      @default(now())
+  inGameTime  String?
+  createdAt   DateTime      @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, type])
+}
+
+// ───────────────────────────── Judgment ─────────────────────────────
+// status: PENDING | ROLLED | RESOLVED | CANCELLED
+
+model Judgment {
+  id             String         @id @default(cuid())
+  sessionId      String
+  session        Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  characterId    String
+  character      Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  skillName      String
+  difficulty     String         @default("regular")
+  bonusDice      Int            @default(0)
+  scMin          Int?
+  scMax          Int?
+
+  status         String         @default("PENDING")
+  rolledById     String?
+  rolledAt       DateTime?
+
+  diceRolls      String?        // JSON array
+  tens           Int?
+  unit           Int?
+  successLevel   String?
+  scLoss         Int?
+  targetSnapshot String?        // JSON
+  note           String?
+
+  log            LogEntry?
+  createdAt      DateTime       @default(now())
+
+  @@index([sessionId, status])
+  @@index([characterId])
+}
+
+// ───────────────────────────── Settlement ─────────────────────────────
+// step: SAN_RECOVERY | KNOWLEDGE_GAIN | RETIREMENT | SKILL_GROWTH | DONE
+
+model Settlement {
+  id            String         @id @default(cuid())
+  sessionId     String         @unique
+  session       Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  step          String         @default("SAN_RECOVERY")
+
+  sanRecoveries String?
+  knowledgeGains String?
+  retirements   String?
+  skillGrowths  String?
+
+  completedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
