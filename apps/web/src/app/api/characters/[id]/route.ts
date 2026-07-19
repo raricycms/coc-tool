@@ -6,6 +6,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -22,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -32,7 +34,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!existing) return fail(404, 'not_found');
     if (existing.ownerId !== user.id) return fail(403, 'forbidden');
 
-    const body = CharacterUpdateSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = CharacterUpdateSchema.parse(rawBody);
 
     // 检查是否在跑团中（避免修改）
     const activeSession = await prisma.sessionMember.findFirst({
@@ -114,11 +117,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     return ok(character);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;

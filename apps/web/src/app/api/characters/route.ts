@@ -6,6 +6,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(_req: NextRequest) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const list = await prisma.character.findMany({
@@ -20,9 +21,11 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
-    const body = CharacterCreateSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = CharacterCreateSchema.parse(rawBody);
 
     const age = body.age ?? 25;
     const derived = derive(body.primary as PrimaryStats, age);
@@ -89,6 +92,6 @@ export async function POST(req: NextRequest) {
     });
     return ok(character);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

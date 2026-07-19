@@ -5,6 +5,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  let rawBody: unknown = null;
   try {
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
@@ -28,9 +29,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
-    const body = RecruitmentCreateSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = RecruitmentCreateSchema.parse(rawBody);
 
     const recruitment = await prisma.recruitment.create({
       data: {
@@ -48,6 +51,6 @@ export async function POST(req: NextRequest) {
     });
     return ok(recruitment);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

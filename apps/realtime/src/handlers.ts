@@ -11,6 +11,7 @@ import {
   JudgmentRollSchema,
   ClockControlSchema,
   SOCKET_EVENTS,
+  formatZodError,
   type OOCMessage,
   type ICMessage,
   type JudgmentCreatedEvent,
@@ -19,6 +20,7 @@ import {
   type PresenceUpdate,
   type LogEntryPayload,
 } from '@coc-tools/shared';
+import { ZodError } from 'zod';
 import {
   judge as runJudgment,
   calculateSanLoss,
@@ -35,6 +37,12 @@ import {
   setClockUpdateHandler,
 } from './state.js';
 import type { AuthedSocket } from './auth.js';
+
+/** 把抛出的错误翻译成中文消息，Zod 错误走专用格式化。 */
+function formatErrorMessage(err: unknown): string {
+  if (err instanceof ZodError) return formatZodError(err);
+  return err instanceof Error ? err.message : String(err);
+}
 
 export async function registerHandlers(io: Server) {
   // 时钟 tick 推送给所有客户端
@@ -60,7 +68,7 @@ export async function registerHandlers(io: Server) {
       try {
         await joinRoom(io, s, sessionId);
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -76,7 +84,7 @@ export async function registerHandlers(io: Server) {
         });
         s.emit(SOCKET_EVENTS.LOG_HISTORY_RES, { entries: entries.reverse() });
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -105,7 +113,7 @@ export async function registerHandlers(io: Server) {
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.OOC_MESSAGE, msg);
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -153,7 +161,7 @@ export async function registerHandlers(io: Server) {
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.IC_MESSAGE, msg);
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -210,7 +218,7 @@ export async function registerHandlers(io: Server) {
         };
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_CREATED, evt);
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -336,7 +344,7 @@ export async function registerHandlers(io: Server) {
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_RESULT, resultEvt);
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(logEntry));
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -351,7 +359,7 @@ export async function registerHandlers(io: Server) {
         });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_CANCELLED, { id: judgmentId });
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -389,7 +397,7 @@ export async function registerHandlers(io: Server) {
           });
         }
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 
@@ -418,7 +426,7 @@ export async function registerHandlers(io: Server) {
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.HP_CHANGED, { characterId, hpAfter });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
       } catch (err) {
-        s.emit(SOCKET_EVENTS.ERROR, { message: (err as Error).message });
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
     });
 

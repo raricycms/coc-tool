@@ -5,6 +5,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -23,10 +24,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
-    const body = ApplicationCreateSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = ApplicationCreateSchema.parse(rawBody);
 
     const r = await prisma.recruitment.findUnique({ where: { id } });
     if (!r) return fail(404, 'not_found');
@@ -61,6 +64,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     return ok(app);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

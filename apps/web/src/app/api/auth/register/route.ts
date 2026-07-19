@@ -17,13 +17,17 @@ function passwordFingerprint(password: string, username: string, email?: string)
 }
 
 export async function POST(req: NextRequest) {
+  // rawBody 在 try 外声明，让 catch 一定能访问到；初始 null，
+  // 只有当真正读出 body 后才用于字段级错误格式化。
+  let rawBody: unknown = null;
   try {
     // 限频
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ?? 'local';
     const rl = rateLimit(`auth:register:${ip}`, 5, 60_000);
     if (!rl.ok) return fail(429, 'rate_limited', '请求过于频繁');
 
-    const body = RegisterSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = RegisterSchema.parse(rawBody);
 
     if (!verifyCaptcha(body.captchaToken, body.captchaAnswer)) {
       return fail(400, 'captcha_invalid', '验证码错误或已过期');
@@ -61,6 +65,6 @@ export async function POST(req: NextRequest) {
 
     return ok({ userId: user.id, username: user.username });
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

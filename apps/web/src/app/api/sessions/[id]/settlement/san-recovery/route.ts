@@ -5,6 +5,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (s.kpId !== user.id) return fail(403, 'forbidden');
     if (s.status !== 'SETTLING') return fail(400, 'not_settling');
 
-    const body = SanRecoverySchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = SanRecoverySchema.parse(rawBody);
 
     await prisma.$transaction(async (tx) => {
       for (const r of body.sanRecoveries) {
@@ -48,6 +50,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return ok({ step: 'KNOWLEDGE_GAIN' });
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

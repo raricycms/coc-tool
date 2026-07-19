@@ -5,6 +5,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const { id } = await params;
     const r = await prisma.recruitment.findUnique({
@@ -26,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;
@@ -33,7 +35,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!r) return fail(404, 'not_found');
     if (r.kpId !== user.id) return fail(403, 'forbidden');
 
-    const body = RecruitmentUpdateSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = RecruitmentUpdateSchema.parse(rawBody);
     const minPlayers = body.minPlayers ?? r.minPlayers;
     const maxPlayers = body.maxPlayers ?? r.maxPlayers;
     if (maxPlayers < minPlayers) {
@@ -55,11 +58,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     return ok(updated);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id } = await params;

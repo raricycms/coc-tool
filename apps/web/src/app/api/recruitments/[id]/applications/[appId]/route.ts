@@ -5,6 +5,7 @@ import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; appId: string }> }) {
+  let rawBody: unknown = null;
   try {
     const user = await requireUser();
     const { id, appId } = await params;
@@ -12,7 +13,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!r) return fail(404, 'not_found');
     if (r.kpId !== user.id) return fail(403, 'forbidden');
 
-    const body = ApplicationReviewSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = ApplicationReviewSchema.parse(rawBody);
     const updated = await prisma.application.update({
       where: { id: appId },
       data: {
@@ -23,6 +25,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     return ok(updated);
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }

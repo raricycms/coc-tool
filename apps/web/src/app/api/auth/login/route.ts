@@ -8,12 +8,14 @@ import { rateLimit } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 
 export async function POST(req: NextRequest) {
+  let rawBody: unknown = null;
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ?? 'local';
     const rl = rateLimit(`auth:login:${ip}`, 10, 60_000);
     if (!rl.ok) return fail(429, 'rate_limited', '请求过于频繁');
 
-    const body = LoginSchema.parse(await req.json());
+    rawBody = await req.json();
+    const body = LoginSchema.parse(rawBody);
 
     if (!verifyCaptcha(body.captchaToken, body.captchaAnswer)) {
       return fail(400, 'captcha_invalid', '验证码错误或已过期');
@@ -38,6 +40,6 @@ export async function POST(req: NextRequest) {
 
     return ok({ userId: user.id, username: user.username });
   } catch (e) {
-    return handleError(e);
+    return handleError(e, { root: rawBody ?? undefined });
   }
 }
