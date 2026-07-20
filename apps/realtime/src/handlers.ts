@@ -10,6 +10,7 @@ import {
   JudgmentCreateSchema,
   JudgmentRollSchema,
   ClockControlSchema,
+  LogHistoryRequestSchema,
   SOCKET_EVENTS,
   formatZodError,
   type OOCMessage,
@@ -22,7 +23,8 @@ import {
 import { ZodError } from 'zod';
 import {
   judge as runJudgment,
-  calculateSanLoss,
+  calculateSanLossFromExpr,
+  resolvePrimaryStatKey,
   SUCCESS_LABELS,
 } from '@coc-tools/coc-rules';
 import {
@@ -85,10 +87,14 @@ export async function registerHandlers(io: Server) {
     });
 
     // ── log history ──
-    s.on(SOCKET_EVENTS.LOG_HISTORY, async ({ sessionId, before }: { sessionId: string; before?: string }) => {
+    s.on(SOCKET_EVENTS.LOG_HISTORY, async (raw: unknown) => {
       try {
+        const { sessionId, before, types } = LogHistoryRequestSchema.parse(raw);
+        // 必须是 session 成员才能拉历史
+        await ensureMember(sessionId, user.userId);
         const where: any = { sessionId };
         if (before) where.createdAt = { lt: new Date(before) };
+        if (types?.length) where.type = { in: types };
         const entries = await prisma.logEntry.findMany({
           where,
           orderBy: { createdAt: 'desc' },
@@ -193,12 +199,25 @@ export async function registerHandlers(io: Server) {
         if (!char) throw new Error('角色不存在');
 
         let skillValue: number;
-        if (data.skillName === 'SAN') skillValue = char.sanCurrent;
-        else if (data.skillName === '幸运' || data.skillName === 'LUCK') skillValue = char.luckCurrent;
-        else {
-          const skill = char.skills.find((s) => s.name === data.skillName);
-          if (!skill) throw new Error(`角色没有技能：${data.skillName}`);
-          skillValue = skill.value;
+        if (data.skillName === 'SAN') {
+          skillValue = char.sanCurrent;
+        } else if (data.skillName === '幸运' || data.skillName === 'LUCK') {
+          skillValue = char.luckCurrent;
+        } else {
+          // 优先尝试 9 个基础属性（STR/CON/SIZ/DEX/APP/INT/POW/EDU）
+          const statKey = resolvePrimaryStatKey(data.skillName);
+          if (statKey) {
+            skillValue = (char as any)[statKey] as number;
+          } else {
+            const skill = char.skills.find((s) => s.name === data.skillName);
+            if (!skill) throw new Error(`角色没有技能/属性：${data.skillName}`);
+            skillValue = skill.value;
+          }
+        }
+
+        // SAN check 必须至少带一个骰子表达式（旧字段 scMin/scMax 不再读取）
+        if (data.skillName === 'SAN' && !data.scSuccessExpr && !data.scFailureExpr) {
+          throw new Error('SAN check 必须指定成功/失败时的损失骰表达式（如 1d3 / 1d6）');
         }
 
         const judgment = await prisma.judgment.create({
@@ -208,11 +227,20 @@ export async function registerHandlers(io: Server) {
             skillName: data.skillName,
             difficulty: data.difficulty,
             bonusDice: data.bonusDice,
-            scMin: data.scMin,
-            scMax: data.scMax,
+            // 旧字段不再写入；保留 NULL 兼容历史
+            scMin: null,
+            scMax: null,
+            // 新字段
+            scSuccessExpr: data.scSuccessExpr ?? null,
+            scFailureExpr: data.scFailureExpr ?? null,
             note: data.note,
             status: 'PENDING',
-            targetSnapshot: JSON.stringify({ skillName: data.skillName, value: skillValue, hp: char.hpCurrent, san: char.sanCurrent }),
+            targetSnapshot: JSON.stringify({
+              skillName: data.skillName,
+              value: skillValue,
+              hp: char.hpCurrent,
+              san: char.sanCurrent,
+            }),
           },
         });
 
@@ -223,8 +251,8 @@ export async function registerHandlers(io: Server) {
           skillName: data.skillName,
           difficulty: data.difficulty,
           bonusDice: data.bonusDice,
-          scMin: data.scMin,
-          scMax: data.scMax,
+          scSuccessExpr: data.scSuccessExpr,
+          scFailureExpr: data.scFailureExpr,
           note: data.note ?? undefined,
           createdAt: judgment.createdAt.toISOString(),
         };
@@ -261,14 +289,22 @@ export async function registerHandlers(io: Server) {
           bonusDice: judgment.bonusDice,
         });
 
+        // SAN check：1d100 vs currentSAN，按 KP 设的骰子表达式扣 SAN
         let scLoss: number | null = null;
-        if (judgment.skillName === 'SAN' && judgment.scMin != null && judgment.scMax != null) {
-          scLoss = calculateSanLoss(
-            result.successLevel,
-            judgment.scMin,
-            judgment.scMax,
+        let sanPassed: boolean | null = null;
+        let sanLossExpr: string | null = null;
+        let sanLossRolls: number[] | null = null;
+        if (judgment.skillName === 'SAN') {
+          const sanResult = calculateSanLossFromExpr(
+            result.final,
             snapshot.san ?? 99,
+            judgment.scSuccessExpr ?? '',
+            judgment.scFailureExpr ?? '',
           );
+          scLoss = sanResult.loss;
+          sanPassed = sanResult.passed;
+          sanLossExpr = sanResult.expr;
+          sanLossRolls = sanResult.rolls;
         }
 
         // 更新
@@ -281,6 +317,9 @@ export async function registerHandlers(io: Server) {
             unit: result.unit,
             successLevel: result.successLevel,
             scLoss,
+            sanPassed,
+            sanLossExpr,
+            sanLossRolls: sanLossRolls ? JSON.stringify(sanLossRolls) : null,
             rolledById: user.userId,
             rolledAt: new Date(),
           },
@@ -304,6 +343,9 @@ export async function registerHandlers(io: Server) {
               final: result.final,
               successLevel: result.successLevel,
               successLabel: SUCCESS_LABELS[result.successLevel],
+              sanPassed,
+              sanLossExpr,
+              sanLossRolls,
               scLoss,
               targetSnapshot: snapshot,
             }),
@@ -321,10 +363,14 @@ export async function registerHandlers(io: Server) {
         if (scLoss && scLoss > 0) {
           const char = await prisma.character.findUnique({ where: { id: judgment.characterId } });
           if (char) {
+            const sanAfter = Math.max(0, char.sanCurrent - scLoss);
             await prisma.character.update({
               where: { id: char.id },
-              data: { sanCurrent: Math.max(0, char.sanCurrent - scLoss) },
+              data: { sanCurrent: sanAfter },
             });
+            const lossDesc = sanLossExpr && sanLossRolls
+              ? `${sanLossExpr}（投出 ${sanLossRolls.join('+')}）`
+              : `${scLoss}`;
             await prisma.logEntry.create({
               data: {
                 sessionId: payload.sessionId,
@@ -332,8 +378,8 @@ export async function registerHandlers(io: Server) {
                 characterId: char.id,
                 payload: JSON.stringify({
                   delta: -scLoss,
-                  sanAfter: Math.max(0, char.sanCurrent - scLoss),
-                  reason: `SAN check 失败（${SUCCESS_LABELS[result.successLevel]}）`,
+                  sanAfter,
+                  reason: `SAN check ${sanPassed ? '成功' : '失败'}（${SUCCESS_LABELS[result.successLevel]} · ${lossDesc}）`,
                 }),
                 inGameTime: clock?.inGameTime,
               },
@@ -349,6 +395,9 @@ export async function registerHandlers(io: Server) {
           unit: result.unit,
           final: result.final,
           successLevel: result.successLevel,
+          sanPassed: sanPassed ?? undefined,
+          sanLossExpr: sanLossExpr ?? undefined,
+          sanLossRolls: sanLossRolls ?? undefined,
           scLoss: scLoss ?? undefined,
           rolledById: user.userId,
           rolledAt: updated.rolledAt!.toISOString(),
