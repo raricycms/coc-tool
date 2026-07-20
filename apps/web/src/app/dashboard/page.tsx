@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 
-  const [characters, asKpSessions, asPlSessions, myRecruitments, openRecruitments] = await Promise.all([
+  const [characters, asKpSessions, asPlSessions, myRecruitments, openRecruitments, spectatableSessions] = await Promise.all([
     prisma.character.findMany({
       where: { ownerId: user.id },
       orderBy: { updatedAt: 'desc' },
@@ -36,6 +36,20 @@ export default async function DashboardPage() {
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: { kp: { select: { username: true } } },
+    }),
+    // 可观战的跑团：公开招募 + 当前状态 RUNNING/PAUSED，且本人尚未在此 session 担任 KP/PL/SPECTATOR
+    prisma.session.findMany({
+      where: {
+        status: { in: ['RUNNING', 'PAUSED'] },
+        recruitment: { visibility: 'public' },
+        members: { none: { userId: user.id } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+      include: {
+        kp: { select: { username: true } },
+        _count: { select: { members: { where: { leftAt: null } } } },
+      },
     }),
   ]);
 
@@ -124,7 +138,31 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* 3. 我发布的招募 + 公开招募（左右两栏，避免再叠成三列拥挤） */}
+      {/* 3. 可观战的跑团：用户既不是 KP/PL 也尚未观战过的公开在跑 session */}
+      <section>
+        <SectionTitle title="正在进行的跑团（观战入口）" />
+        {spectatableSessions.length === 0 ? (
+          <EmptyState text="暂无可观战的跑团。" />
+        ) : (
+          <ul className="card divide-y divide-sky-200 p-0">
+            {spectatableSessions.map((s) => (
+              <li key={s.id}>
+                <Link href={`/sessions/${s.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-ink">{s.title}</div>
+                    <div className="text-xs text-ink-soft">
+                      KP @{s.kp.username} · 成员 {s._count.members}
+                    </div>
+                  </div>
+                  <Tag tone="ok">→ 进入观战</Tag>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* 4. 我发布的招募 + 公开招募（左右两栏，避免再叠成三列拥挤） */}
       <section className="grid gap-6 lg:grid-cols-2">
         <div>
           <SectionTitle
