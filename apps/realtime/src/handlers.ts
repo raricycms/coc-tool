@@ -9,6 +9,7 @@ import {
   ICSendSchema,
   JudgmentCreateSchema,
   JudgmentRollSchema,
+  HpDiceRollSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
   SOCKET_EVENTS,
@@ -26,6 +27,7 @@ import {
   calculateSanLossFromExpr,
   resolvePrimaryStatKey,
   SUCCESS_LABELS,
+  rollExpressionDetailed,
 } from '@coc-tools/coc-rules';
 import {
   initRuntime,
@@ -191,74 +193,96 @@ export async function registerHandlers(io: Server) {
 
         const data = JudgmentCreateSchema.parse(payload);
 
-        // 取该 PC 当前技能快照
-        const char = await prisma.character.findUnique({
-          where: { id: data.targetCharacterId },
-          include: { skills: true },
-        });
-        if (!char) throw new Error('角色不存在');
-
-        let skillValue: number;
-        if (data.skillName === 'SAN') {
-          skillValue = char.sanCurrent;
-        } else if (data.skillName === '幸运' || data.skillName === 'LUCK') {
-          skillValue = char.luckCurrent;
+        // 单目标 vs 群发：二选一
+        let targetIds: string[];
+        if (data.targetCharacterIds && data.targetCharacterIds.length > 0) {
+          targetIds = data.targetCharacterIds;
+        } else if (data.targetCharacterId) {
+          targetIds = [data.targetCharacterId];
         } else {
-          // 优先尝试 9 个基础属性（STR/CON/SIZ/DEX/APP/INT/POW/EDU）
-          const statKey = resolvePrimaryStatKey(data.skillName);
-          if (statKey) {
-            skillValue = (char as any)[statKey] as number;
-          } else {
-            const skill = char.skills.find((s) => s.name === data.skillName);
-            if (!skill) throw new Error(`角色没有技能/属性：${data.skillName}`);
-            skillValue = skill.value;
-          }
+          throw new Error('需要指定 targetCharacterId 或 targetCharacterIds');
         }
+        // 去重 + 保持顺序
+        targetIds = Array.from(new Set(targetIds));
 
-        // SAN check 必须至少带一个骰子表达式（旧字段 scMin/scMax 不再读取）
+        // SAN check 必须至少带一个骰子表达式
         if (data.skillName === 'SAN' && !data.scSuccessExpr && !data.scFailureExpr) {
           throw new Error('SAN check 必须指定成功/失败时的损失骰表达式（如 1d3 / 1d6）');
         }
 
-        const judgment = await prisma.judgment.create({
-          data: {
-            sessionId: payload.sessionId,
-            characterId: data.targetCharacterId,
+        // 群发：每个角色各自取自己的技能值生成独立 Judgment
+        // 一次性批量查所有目标 + 各自技能，避免 N+1
+        const chars = await prisma.character.findMany({
+          where: { id: { in: targetIds } },
+          include: { skills: true },
+        });
+        if (chars.length !== targetIds.length) {
+          const found = new Set(chars.map((c) => c.id));
+          const missing = targetIds.filter((id) => !found.has(id));
+          throw new Error(`角色不存在：${missing.join(', ')}`);
+        }
+
+        const created: JudgmentCreatedEvent[] = [];
+        for (const char of chars) {
+          let skillValue: number;
+          if (data.skillName === 'SAN') {
+            skillValue = char.sanCurrent;
+          } else if (data.skillName === '幸运' || data.skillName === 'LUCK') {
+            skillValue = char.luckCurrent;
+          } else {
+            // 优先尝试 9 个基础属性（STR/CON/SIZ/DEX/APP/INT/POW/EDU）
+            const statKey = resolvePrimaryStatKey(data.skillName);
+            if (statKey) {
+              skillValue = (char as any)[statKey] as number;
+            } else {
+              const skill = char.skills.find((s) => s.name === data.skillName);
+              if (!skill) throw new Error(`${char.name} 没有技能/属性：${data.skillName}`);
+              skillValue = skill.value;
+            }
+          }
+
+          const judgment = await prisma.judgment.create({
+            data: {
+              sessionId: payload.sessionId,
+              characterId: char.id,
+              skillName: data.skillName,
+              difficulty: data.difficulty,
+              bonusDice: data.bonusDice,
+              scMin: null,
+              scMax: null,
+              scSuccessExpr: data.scSuccessExpr ?? null,
+              scFailureExpr: data.scFailureExpr ?? null,
+              note: data.note,
+              status: 'PENDING',
+              targetSnapshot: JSON.stringify({
+                skillName: data.skillName,
+                value: skillValue,
+                hp: char.hpCurrent,
+                hpMax: char.hpMax,
+                san: char.sanCurrent,
+                sanMax: char.sanMax,
+              }),
+            },
+          });
+
+          created.push({
+            id: judgment.id,
+            characterId: char.id,
+            characterName: char.name,
             skillName: data.skillName,
             difficulty: data.difficulty,
             bonusDice: data.bonusDice,
-            // 旧字段不再写入；保留 NULL 兼容历史
-            scMin: null,
-            scMax: null,
-            // 新字段
-            scSuccessExpr: data.scSuccessExpr ?? null,
-            scFailureExpr: data.scFailureExpr ?? null,
-            note: data.note,
-            status: 'PENDING',
-            targetSnapshot: JSON.stringify({
-              skillName: data.skillName,
-              value: skillValue,
-              hp: char.hpCurrent,
-              hpMax: char.hpMax,
-              san: char.sanCurrent,
-              sanMax: char.sanMax,
-            }),
-          },
-        });
+            scSuccessExpr: data.scSuccessExpr,
+            scFailureExpr: data.scFailureExpr,
+            note: data.note ?? undefined,
+            createdAt: judgment.createdAt.toISOString(),
+          });
+        }
 
-        const evt: JudgmentCreatedEvent = {
-          id: judgment.id,
-          characterId: data.targetCharacterId,
-          characterName: char.name,
-          skillName: data.skillName,
-          difficulty: data.difficulty,
-          bonusDice: data.bonusDice,
-          scSuccessExpr: data.scSuccessExpr,
-          scFailureExpr: data.scFailureExpr,
-          note: data.note ?? undefined,
-          createdAt: judgment.createdAt.toISOString(),
-        };
-        io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_CREATED, evt);
+        // 每个 Judgment 单独 emit，方便前端分别入队
+        for (const evt of created) {
+          io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_CREATED, evt);
+        }
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -489,6 +513,58 @@ export async function registerHandlers(io: Server) {
         });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.HP_CHANGED, { characterId, hpAfter });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    // ── HP dice roll (KP only) ──
+    // KP 给 PL 一个 1dN（任意 N）扣 HP 骰子：服务端掷骰，把结果作为负 delta 应用。
+    s.on(SOCKET_EVENTS.HP_DICE_ROLL, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以掷扣 HP 骰子');
+        const data = HpDiceRollSchema.parse(raw);
+        const char = await prisma.character.findUnique({ where: { id: data.characterId } });
+        if (!char) throw new Error('角色不存在');
+
+        const roll = rollExpressionDetailed(data.diceExpr);
+        // 扣血按表达式总和取负；表达式可以是治疗（恒为正），但一般 1dN 是扣血。
+        const delta = -Math.abs(roll.total);
+        const hpAfter = Math.max(0, Math.min(char.hpMax, char.hpCurrent + delta));
+        await prisma.character.update({
+          where: { id: char.id },
+          data: { hpCurrent: hpAfter },
+        });
+        const clock = getCurrentClock(raw.sessionId);
+        const entry = await prisma.logEntry.create({
+          data: {
+            sessionId: raw.sessionId,
+            type: 'HP_CHANGE',
+            characterId: char.id,
+            payload: JSON.stringify({
+              delta,
+              hpAfter,
+              hpMax: char.hpMax,
+              reason: data.reason,
+              // 新增：让日志显示「1d6=6」之类的明细
+              diceExpr: roll.expr,
+              diceRolls: roll.rolls,
+              diceTotal: roll.total,
+            }),
+            inGameTime: clock?.inGameTime,
+          },
+        });
+        io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.HP_CHANGED, { characterId: char.id, hpAfter });
+        io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.HP_DICED, {
+          characterId: char.id,
+          diceExpr: roll.expr,
+          diceRolls: roll.rolls,
+          diceTotal: roll.total,
+          hpAfter,
+          reason: data.reason,
+        });
+        io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }

@@ -293,6 +293,10 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     socketRef.current?.emit(SOCKET_EVENTS.HP_CHANGE, { sessionId, characterId, delta, reason });
   }, [sessionId]);
 
+  const rollHpDice = useCallback((characterId: string, diceExpr: string, reason: string) => {
+    socketRef.current?.emit(SOCKET_EVENTS.HP_DICE_ROLL, { sessionId, characterId, diceExpr, reason });
+  }, [sessionId]);
+
   return (
     <div className="flex-1 flex flex-col">
       {!connected && (
@@ -330,11 +334,24 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
                 hp: m.character!.hp, hpMax: m.character!.hpMax,
               }))}
               onChange={changeHp}
+              onDice={rollHpDice}
             />
           )}
           {role === 'KP' && (
             <JudgmentCreator
               characters={members.filter((m) => m.character).map((m) => {
+                const c = m.character!;
+                return {
+                  id: c.id,
+                  name: c.name,
+                  str: c.str, con: c.con, siz: c.siz, dex: c.dex,
+                  app: c.app, int: c.int, pow: c.pow, edu: c.edu,
+                  skills: c.skills,
+                  sanCurrent: c.san,
+                  luck: c.luck,
+                };
+              })}
+              plCharacters={members.filter((m) => m.role === 'PL' && m.character).map((m) => {
                 const c = m.character!;
                 return {
                   id: c.id,

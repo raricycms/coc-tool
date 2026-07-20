@@ -9,6 +9,7 @@ import type {
   ICSendSchema,
   JudgmentCreateSchema,
   JudgmentRollSchema,
+  HpDiceRollSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
 } from './schemas';
@@ -22,6 +23,7 @@ export const SOCKET_EVENTS = {
   JUDGMENT_CANCEL: 'judgment:cancel',
   CLOCK_CONTROL: 'clock:control',
   HP_CHANGE: 'hp:change',
+  HP_DICE_ROLL: 'hp:dice:roll',
   JOIN_SESSION: 'session:join',
   LEAVE_SESSION: 'session:leave',
   LOG_HISTORY: 'log:history',
@@ -34,6 +36,7 @@ export const SOCKET_EVENTS = {
   JUDGMENT_CANCELLED: 'judgment:cancelled',
   CLOCK_STATE: 'clock:state',
   HP_CHANGED: 'hp:changed',
+  HP_DICED: 'hp:diced',
   PRESENCE_UPDATE: 'presence:update',
   LOG_ENTRY: 'log:entry',
   LOG_HISTORY_RES: 'log:history:res',
@@ -49,6 +52,7 @@ export type JudgmentCreatePayload = z.infer<typeof JudgmentCreateSchema>;
 export type JudgmentRollPayload = z.infer<typeof JudgmentRollSchema>;
 export type ClockControlPayload = z.infer<typeof ClockControlSchema>;
 export type LogHistoryRequestPayload = z.infer<typeof LogHistoryRequestSchema>;
+export type HpDiceRollPayload = z.infer<typeof HpDiceRollSchema>;
 
 // ── 推送给客户端的消息 ──
 

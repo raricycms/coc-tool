@@ -4,7 +4,16 @@ import { z } from 'zod';
 const DiceExpr = z.string().regex(/^(\d+d\d+|\d+)([+-](\d+d\d+|\d+))*$/).max(30);
 
 export const JudgmentCreateSchema = z.object({
-  targetCharacterId: z.string().min(1),
+  /**
+   * 单目标判定：直接给一个角色 id。
+   * 与 `targetCharacterIds` 二选一；都不填时 422。
+   */
+  targetCharacterId: z.string().min(1).optional(),
+  /**
+   * 群发判定：一次创建多个 Judgment，每个角色一个。
+   * 通常由 KP 选「群发：所有 PL」时填入所有 PL 的角色 id。
+   */
+  targetCharacterIds: z.array(z.string().min(1)).min(1).max(20).optional(),
   type: z.enum(['skill', 'san', 'luck', 'combat', 'opposed']),
   skillName: z.string().min(1).max(40),
   difficulty: z.enum(['regular', 'hard', 'extreme']).default('regular'),
@@ -22,5 +31,13 @@ export const JudgmentRollSchema = z.object({
   judgmentId: z.string().min(1),
 });
 
+/** KP 用骰子表达式扣 HP：例如 1d6 / 2d6+1 / 1d4+1d3 */
+export const HpDiceRollSchema = z.object({
+  characterId: z.string().min(1),
+  diceExpr: DiceExpr,
+  reason: z.string().min(1).max(200),
+});
+
 export type JudgmentCreate = z.infer<typeof JudgmentCreateSchema>;
 export type JudgmentRoll = z.infer<typeof JudgmentRollSchema>;
+export type HpDiceRoll = z.infer<typeof HpDiceRollSchema>;

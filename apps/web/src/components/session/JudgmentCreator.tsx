@@ -6,23 +6,28 @@ import { PRIMARY_STAT_LABELS, type PrimaryStatKey } from '@coc-tools/coc-rules';
 type Tab = 'skill' | 'attribute' | 'san';
 const PRIMARY_STATS = Object.entries(PRIMARY_STAT_LABELS) as Array<[PrimaryStatKey, string]>;
 
+interface CharacterLite {
+  id: string;
+  name: string;
+  str: number; con: number; siz: number; dex: number;
+  app: number; int: number; pow: number; edu: number;
+  skills: Array<{ name: string; value: number; isMythos: boolean }>;
+  sanCurrent: number;
+  luck: number;
+}
+
 interface Props {
-  characters: Array<{
-    id: string;
-    name: string;
-    str: number; con: number; siz: number; dex: number;
-    app: number; int: number; pow: number; edu: number;
-    skills: Array<{ name: string; value: number; isMythos: boolean }>;
-    sanCurrent: number;
-    luck: number;
-  }>;
+  characters: CharacterLite[];
+  /** 同 session 内所有 PL 角色（用于群发）。一般是 characters 的子集（剔除 KP 自己）。 */
+  plCharacters: CharacterLite[];
   onCreate: (payload: any) => void;
 }
 
-export function JudgmentCreator({ characters, onCreate }: Props) {
+export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('skill');
   const [targetId, setTargetId] = useState(characters[0]?.id ?? '');
+  const [broadcast, setBroadcast] = useState(false);
   const target = characters.find((c) => c.id === targetId);
   const [skillName, setSkillName] = useState('');
   const [difficulty, setDifficulty] = useState<'regular' | 'hard' | 'extreme'>('regular');
@@ -45,9 +50,8 @@ export function JudgmentCreator({ characters, onCreate }: Props) {
   };
 
   const submit = () => {
-    if (!target) return;
-    onCreate({
-      targetCharacterId: target.id,
+    if (!target && !broadcast) return;
+    const payload: any = {
       type: isSan ? 'san' : 'skill',
       skillName,
       difficulty,
@@ -56,7 +60,13 @@ export function JudgmentCreator({ characters, onCreate }: Props) {
       scSuccessExpr: isSan ? scSuccessExpr : undefined,
       scFailureExpr: isSan ? scFailureExpr : undefined,
       note: note || undefined,
-    });
+    };
+    if (broadcast && plCharacters.length > 0) {
+      payload.targetCharacterIds = plCharacters.map((c) => c.id);
+    } else {
+      payload.targetCharacterId = target!.id;
+    }
+    onCreate(payload);
     setOpen(false);
     setNote('');
   };
@@ -68,12 +78,36 @@ export function JudgmentCreator({ characters, onCreate }: Props) {
   return (
     <div className="card space-y-2">
       <h3 className="font-bold text-sm">发布判定</h3>
+
+      {/* 群发开关 */}
+      {plCharacters.length > 1 && (
+        <label className="flex items-center gap-2 text-xs cursor-pointer">
+          <input
+            type="checkbox"
+            checked={broadcast}
+            onChange={(e) => setBroadcast(e.target.checked)}
+          />
+          <span>📢 群发给所有 PL（{plCharacters.length} 个角色）</span>
+        </label>
+      )}
+
       <div>
         <label className="label text-xs">角色</label>
-        <select className="input text-sm" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+        <select
+          className="input text-sm"
+          value={targetId}
+          onChange={(e) => setTargetId(e.target.value)}
+          disabled={broadcast}
+        >
           {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        {broadcast && (
+          <p className="text-[10px] text-ink-100/40 mt-1">
+            已选群发，将对 {plCharacters.map((c) => c.name).join('、')} 同时发布判定。
+          </p>
+        )}
       </div>
+
       <div className="flex gap-2">
         <button
           className={`flex-1 text-xs py-1 rounded ${tab === 'skill' ? 'bg-brand-600' : 'bg-ink-800'}`}
@@ -163,7 +197,9 @@ export function JudgmentCreator({ characters, onCreate }: Props) {
       </div>
       <div className="flex gap-2 justify-end">
         <button className="btn-ghost text-sm" onClick={() => setOpen(false)}>取消</button>
-        <button className="btn-primary text-sm" onClick={submit} disabled={!skillName}>发布</button>
+        <button className="btn-primary text-sm" onClick={submit} disabled={!skillName || (!target && !broadcast)}>
+          {broadcast ? `群发 ${plCharacters.length} 人` : '发布'}
+        </button>
       </div>
     </div>
   );

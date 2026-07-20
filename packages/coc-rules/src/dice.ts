@@ -80,6 +80,47 @@ export function rollExpression(expr: string, rand: RandomFn = defaultRandom): nu
   return total;
 }
 
+/**
+ * 同 rollExpression，但额外返回每一次投骰的个体值，便于日志展示。
+ *
+ *   rollExpressionDetailed("1d6+1d3")  → { total: 6, rolls: [4, 2], expr: "1d6+1d3" }
+ *   rollExpressionDetailed("3")        → { total: 3, rolls: [3],     expr: "3" }
+ *
+ * 表达式解析失败时抛 Error（让上层决定怎么处理）。
+ */
+export interface DiceRollResult {
+  total: number;
+  rolls: number[];
+  expr: string;
+}
+export function rollExpressionDetailed(expr: string, rand: RandomFn = defaultRandom): DiceRollResult {
+  const cleaned = expr.replace(/\s+/g, '').toLowerCase();
+  if (!cleaned) throw new Error('empty dice expression');
+  const tokens = cleaned.split('+');
+  const rolls: number[] = [];
+  let total = 0;
+  for (const t of tokens) {
+    if (t.includes('d')) {
+      const m = t.match(/^(\d+)d(\d+)$/);
+      if (!m) throw new Error(`bad dice token: ${t}`);
+      const count = parseInt(m[1], 10);
+      const sides = parseInt(m[2], 10);
+      if (count < 1 || count > 1000) throw new Error(`bad dice count: ${count}`);
+      if (sides < 1 || sides > 1000) throw new Error(`bad dice sides: ${sides}`);
+      const r = rollDice(count, sides, rand);
+      rolls.push(...r);
+      total += r.reduce((a, b) => a + b, 0);
+    } else if (/^\d+$/.test(t)) {
+      const v = parseInt(t, 10);
+      rolls.push(v);
+      total += v;
+    } else {
+      throw new Error(`bad dice token: ${t}`);
+    }
+  }
+  return { total, rolls, expr: cleaned };
+}
+
 /** 整数范围内随机（含 min / max） */
 export function randomInt(min: number, max: number, rand: RandomFn = defaultRandom): number {
   if (max < min) throw new Error('max must be >= min');
