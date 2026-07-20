@@ -49,25 +49,25 @@ export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画内 · IC</h3>
         <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
       </header>
-      <div ref={scrollerRef} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm min-h-0">
+      <div ref={scrollerRef} className="flex-1 space-y-2 overflow-y-auto overflow-x-hidden pr-1 text-sm min-h-0">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (
           messages.map((m) => (
             <div
               key={m.id}
-              className={`border-l-2 pl-2.5 ${m.kind === 'desc' ? 'border-macaron-300' : 'border-sky-200'}`}
+              className={`min-w-0 border-l-2 pl-2.5 ${m.kind === 'desc' ? 'border-macaron-300' : 'border-sky-200'}`}
             >
-              <div className="text-[11px] text-ink-soft">
+              <div className="text-[11px] text-ink-soft break-words">
                 {m.kind === 'desc' ? (
                   <span className="font-semibold text-macaron-600">[主持人描述]</span>
                 ) : (
-                  <span className="font-semibold text-ink">{m.characterName ?? m.authorUsername}</span>
+                  <span className="font-semibold text-ink break-all">{m.characterName ?? m.authorUsername}</span>
                 )}
                 {' · '}
                 {m.inGameDate} {m.inGameTime}
               </div>
-              <div className="whitespace-pre-wrap text-ink">{m.content}</div>
+              <div className="whitespace-pre-wrap break-words text-ink">{m.content}</div>
             </div>
           ))
         )}
@@ -100,7 +100,7 @@ export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName
                 </span>
               ) : (
                 <input
-                  className="input w-32 shrink-0"
+                  className="input !w-32 shrink-0"
                   placeholder="角色名"
                   value={characterName}
                   onChange={(e) => setCharacterName(e.target.value)}
