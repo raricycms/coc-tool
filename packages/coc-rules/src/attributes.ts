@@ -55,9 +55,14 @@ export function derive(primary: PrimaryStats, _age: number): DerivedStats {
   return { hpMax, mpMax, sanMax, mov, build, damageBonus };
 }
 
-/** 八维默认值（3D6 / (2D6+6) / EDU = (2D6+6)*3 占位生成） */
-export const DEFAULT_OCCUPATION_POINTS = (edu: number): number => edu * 4;
-export const DEFAULT_INTEREST_POINTS = (int: number): number => int * 2;
+/** 验证八维值合法（CoC 7e 范围放宽至 1-999，允许高阶成长） */
+export function isValidPrimary(p: PrimaryStats): boolean {
+  const fields: (keyof PrimaryStats)[] = ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'];
+  for (const f of fields) {
+    if (!Number.isInteger(p[f]) || p[f] < 1 || p[f] > 999) return false;
+  }
+  return true;
+}
 
 /**
  * CoC 默认技能初始值。
@@ -115,14 +120,3 @@ export const DEFAULT_SKILLS: Record<string, number> = {
   '投掷': 20,
   '追踪': 10,
 };
-
-/**
- * 验证八维值合法（CoC 7e 范围）
- */
-export function isValidPrimary(p: PrimaryStats): boolean {
-  const fields: (keyof PrimaryStats)[] = ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'];
-  for (const f of fields) {
-    if (!Number.isInteger(p[f]) || p[f] < 1 || p[f] > 100) return false;
-  }
-  return true;
-}

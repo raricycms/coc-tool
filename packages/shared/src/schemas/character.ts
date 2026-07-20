@@ -1,20 +1,20 @@
 import { z } from 'zod';
 
 export const PrimaryStatsSchema = z.object({
-  str: z.number().int().min(1).max(100),
-  con: z.number().int().min(1).max(100),
-  siz: z.number().int().min(1).max(100),
-  dex: z.number().int().min(1).max(100),
-  app: z.number().int().min(1).max(100),
-  int: z.number().int().min(1).max(100),
-  pow: z.number().int().min(1).max(100),
-  edu: z.number().int().min(1).max(100),
-  luck: z.number().int().min(1).max(100).default(50),
+  str: z.number().int().min(1).max(999),
+  con: z.number().int().min(1).max(999),
+  siz: z.number().int().min(1).max(999),
+  dex: z.number().int().min(1).max(999),
+  app: z.number().int().min(1).max(999),
+  int: z.number().int().min(1).max(999),
+  pow: z.number().int().min(1).max(999),
+  edu: z.number().int().min(1).max(999),
+  luck: z.number().int().min(1).max(999).default(50),
 });
 
 export const SkillSchema = z.object({
   name: z.string().min(1).max(40),
-  value: z.number().int().min(0).max(100),
+  value: z.number().int().min(0).max(999),
   isMythos: z.boolean().default(false),
   note: z.string().max(200).optional(),
 });

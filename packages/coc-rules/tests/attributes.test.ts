@@ -72,10 +72,14 @@ describe('attributes', () => {
     });
     it('rejects out-of-range', () => {
       expect(isValidPrimary({ ...STATS_FULL, str: 0 })).toBe(false);
-      expect(isValidPrimary({ ...STATS_FULL, str: 101 })).toBe(false);
+      expect(isValidPrimary({ ...STATS_FULL, str: 1000 })).toBe(false);
     });
     it('rejects non-integer', () => {
       expect(isValidPrimary({ ...STATS_FULL, str: 50.5 })).toBe(false);
+    });
+    it('allows values > 100 (high-tier growth)', () => {
+      expect(isValidPrimary({ ...STATS_FULL, str: 200 })).toBe(true);
+      expect(isValidPrimary({ ...STATS_FULL, edu: 999 })).toBe(true);
     });
   });
 });

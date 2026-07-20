@@ -219,16 +219,40 @@ export function CharacterForm() {
           <div className="max-h-96 overflow-y-auto space-y-2">
             {skills.map((s, i) => (
               <div key={i} className="flex gap-2 items-start">
-                <span className="flex-1 pt-2">{s.name}</span>
+                <FieldError error={get(`skills.${i}.name`)}>
+                  <input
+                    className="input flex-1"
+                    placeholder="技能名称"
+                    value={s.name}
+                    onChange={(e) => {
+                      const c = [...skills];
+                      c[i] = { ...c[i], name: e.target.value };
+                      setSkills(c);
+                      clear(`skills.${i}.name`);
+                    }}
+                  />
+                </FieldError>
                 <div className="w-28">
                   <FieldError error={get(`skills.${i}.value`)}>
-                    <input type="number" className="input" value={s.value} min={0} max={100}
+                    <input type="number" className="input" value={s.value} min={0}
                       onChange={(e) => {
                         const c = [...skills]; c[i] = { ...c[i], value: parseInt(e.target.value) || 0 }; setSkills(c);
                         clear(`skills.${i}.value`);
                       }} />
                   </FieldError>
                 </div>
+                <label className="flex items-center gap-1 text-xs whitespace-nowrap pt-2" title="标记为 Cthulhu Mythos">
+                  <input
+                    type="checkbox"
+                    checked={!!s.isMythos}
+                    onChange={(e) => {
+                      const c = [...skills];
+                      c[i] = { ...c[i], isMythos: e.target.checked };
+                      setSkills(c);
+                    }}
+                  />
+                  Mythos
+                </label>
                 <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setSkills(skills.filter((_, j) => j !== i))}>删除</button>
               </div>
             ))}
@@ -238,7 +262,7 @@ export function CharacterForm() {
             <div className="flex flex-col gap-2 sm:flex-row">
               <input className="input sm:flex-1" placeholder="技能名称" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
               <div className="flex gap-2">
-                <input type="number" className="input w-24 sm:w-28" placeholder="初始值" value={newSkill.value} min={0} max={100}
+                <input type="number" className="input w-24 sm:w-28" placeholder="初始值" value={newSkill.value} min={0}
                   onChange={(e) => setNewSkill({ ...newSkill, value: parseInt(e.target.value) || 0 })} />
                 <button type="button" className="btn-primary flex-1 whitespace-nowrap sm:flex-none" onClick={() => {
                   if (newSkill.name) {

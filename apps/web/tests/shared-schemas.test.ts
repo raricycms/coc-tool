@@ -73,11 +73,16 @@ describe('auth schemas', () => {
 });
 
 describe('character schemas', () => {
-  it('PrimaryStatsSchema: 八维均在 [1,100]', () => {
+  it('PrimaryStatsSchema: 八维均在 [1,999]', () => {
     expect(PrimaryStatsSchema.safeParse(VALID_PRIMARY).success).toBe(true);
     expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, str: 0 }).success).toBe(false);
-    expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, str: 101 }).success).toBe(false);
+    expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, str: 1000 }).success).toBe(false);
     expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, str: 12.5 }).success).toBe(false);
+  });
+
+  it('PrimaryStatsSchema: 允许 >100 的高阶成长', () => {
+    expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, edu: 200 }).success).toBe(true);
+    expect(PrimaryStatsSchema.safeParse({ ...VALID_PRIMARY, str: 999 }).success).toBe(true);
   });
 
   it('PrimaryStatsSchema: luck 默认 50', () => {
@@ -86,11 +91,11 @@ describe('character schemas', () => {
     expect(r.luck).toBe(50);
   });
 
-  it('SkillSchema: value 必须在 [0,100]', () => {
+  it('SkillSchema: value 必须在 [0,999]', () => {
     expect(SkillSchema.safeParse({ name: '聆听', value: 0 }).success).toBe(true);
-    expect(SkillSchema.safeParse({ name: '聆听', value: 100 }).success).toBe(true);
+    expect(SkillSchema.safeParse({ name: '聆听', value: 200 }).success).toBe(true);
     expect(SkillSchema.safeParse({ name: '聆听', value: -1 }).success).toBe(false);
-    expect(SkillSchema.safeParse({ name: '聆听', value: 200 }).success).toBe(false);
+    expect(SkillSchema.safeParse({ name: '聆听', value: 1000 }).success).toBe(false);
   });
 
   it('SkillSchema: name 必填且 <= 40', () => {

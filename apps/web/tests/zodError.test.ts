@@ -2,7 +2,7 @@
  * 测试 Zod 报错的中文格式化 + 字段级错误。
  *
  * 涵盖：
- *   - 单个属性超界 → "属性 STR：不能大于 100"
+ *   - 单个属性超界 → "属性 STR：不能大于 999"
  *   - 字符串必填 → "姓名：不能为空"
  *   - 数组元素的子字段：在 ctx.root 下用条目真名替代「第 N 项」
  *   - 邮箱格式 → "邮箱：格式不正确"
@@ -22,18 +22,18 @@ import { handleError } from '@/lib/api';
 import { resetCookies } from './helpers';
 
 describe('formatZodIssue', () => {
-  it('属性 STR 超界时给出「属性 STR：不能大于 100」', () => {
+  it('属性 STR 超界时给出「属性 STR：不能大于 999」', () => {
     const r = CharacterCreateSchema.safeParse({
       name: '林远',
       primary: {
-        str: 150, con: 50, siz: 50, dex: 50,
+        str: 1000, con: 50, siz: 50, dex: 50,
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [],
     });
     expect(r.success).toBe(false);
     const issue = (r.error as ZodError).issues.find((i) => i.path[0] === 'primary')!;
-    expect(formatZodIssue(issue)).toBe('属性 STR：不能大于 100');
+    expect(formatZodIssue(issue)).toBe('属性 STR：不能大于 999');
   });
 
   it('字符串必填时报「姓名：不能为空」', () => {
@@ -60,12 +60,12 @@ describe('formatZodIssue', () => {
       },
       skills: [
         { name: '侦察', value: 25 },
-        { name: '聆听', value: 200 },
+        { name: '聆听', value: 1000 },
       ],
     });
     expect(r.success).toBe(false);
     const issue = (r.error as ZodError).issues[0];
-    expect(formatZodIssue(issue)).toBe('第 2 项技能的值：不能大于 100');
+    expect(formatZodIssue(issue)).toBe('第 2 项技能的值：不能大于 999');
   });
 
   it('传入 ctx.root 后数组下标替换为条目真名', () => {
@@ -77,13 +77,13 @@ describe('formatZodIssue', () => {
       },
       skills: [
         { name: '侦察', value: 25 },
-        { name: '聆听', value: 200 },
+        { name: '聆听', value: 1000 },
       ],
     };
     const r = CharacterCreateSchema.safeParse(body);
     expect(r.success).toBe(false);
     const issue = (r.error as ZodError).issues[0];
-    expect(formatZodIssue(issue, { root: body })).toBe('聆听的值：不能大于 100');
+    expect(formatZodIssue(issue, { root: body })).toBe('聆听的值：不能大于 999');
   });
 
   it('weapons / equipment 也走同一条替换路径', () => {
@@ -162,7 +162,7 @@ describe('buildFieldErrors', () => {
     const r = CharacterCreateSchema.safeParse({
       name: '林远',
       primary: {
-        str: 200, con: 50, siz: 50, dex: 50,
+        str: 1000, con: 50, siz: 50, dex: 50,
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [],
@@ -171,7 +171,7 @@ describe('buildFieldErrors', () => {
     const fields = buildFieldErrors(r.error as ZodError);
     const f = fields.find((x) => x.key === 'primary.str')!;
     expect(f.label).toBe('属性 STR');
-    expect(f.message).toBe('不能大于 100');
+    expect(f.message).toBe('不能大于 999');
   });
 
   it('传入 ctx.root 后 skills.<i>.value 的 label 用条目名', () => {
@@ -183,7 +183,7 @@ describe('buildFieldErrors', () => {
       },
       skills: [
         { name: '侦察', value: 25 },
-        { name: '聆听', value: 999 },
+        { name: '聆听', value: 1000 },
       ],
     };
     const r = CharacterCreateSchema.safeParse(body);
@@ -192,7 +192,7 @@ describe('buildFieldErrors', () => {
     const f = fields.find((x) => x.key === 'skills.1.value')!;
     // label 是用户友好的字段路径，包含条目真名
     expect(f.label).toBe('聆听的值');
-    expect(f.message).toBe('不能大于 100');
+    expect(f.message).toBe('不能大于 999');
   });
 });
 
@@ -204,7 +204,7 @@ describe('handleError 集成', () => {
   it('ZodError 通过 handleError 返回中文 message 而非英文原串', () => {
     const r = CharacterCreateSchema.safeParse({
       primary: {
-        str: 200, con: 50, siz: 50, dex: 50,
+        str: 1000, con: 50, siz: 50, dex: 50,
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [],
@@ -223,7 +223,7 @@ describe('handleError 集成', () => {
   it('handleError 把 fields 列表附在 error.fields', () => {
     const r = CharacterCreateSchema.safeParse({
       primary: {
-        str: 200, con: 50, siz: 50, dex: 50,
+        str: 1000, con: 50, siz: 50, dex: 50,
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [],
