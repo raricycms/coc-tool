@@ -10,6 +10,7 @@ import type {
   JudgmentCreateSchema,
   JudgmentRollSchema,
   ClockControlSchema,
+  LogHistoryRequestSchema,
 } from './schemas';
 
 export const SOCKET_EVENTS = {
@@ -47,6 +48,7 @@ export type ICSendPayload = z.infer<typeof ICSendSchema>;
 export type JudgmentCreatePayload = z.infer<typeof JudgmentCreateSchema>;
 export type JudgmentRollPayload = z.infer<typeof JudgmentRollSchema>;
 export type ClockControlPayload = z.infer<typeof ClockControlSchema>;
+export type LogHistoryRequestPayload = z.infer<typeof LogHistoryRequestSchema>;
 
 // ── 推送给客户端的消息 ──
 
@@ -80,8 +82,14 @@ export interface JudgmentCreatedEvent {
   skillName: string;
   difficulty: string;
   bonusDice: number;
+  /** @deprecated 旧字段，san check 已改用 scSuccessExpr/scFailureExpr */
   scMin?: number;
+  /** @deprecated 旧字段，san check 已改用 scSuccessExpr/scFailureExpr */
   scMax?: number;
+  /** SAN check 成功时的损失骰表达式（如 "1d3"） */
+  scSuccessExpr?: string;
+  /** SAN check 失败时的损失骰表达式（如 "1d6"） */
+  scFailureExpr?: string;
   note?: string;
   createdAt: string;
 }
@@ -94,6 +102,12 @@ export interface JudgmentResultEvent {
   unit: number;
   final: number;
   successLevel: 'critical' | 'extreme' | 'hard' | 'success' | 'fail' | 'fumble';
+  /** SAN check：是否通过 */
+  sanPassed?: boolean;
+  /** SAN check：实际损失骰表达式（成功/失败对应的那个） */
+  sanLossExpr?: string;
+  /** SAN check：实际投出的骰子值列表 */
+  sanLossRolls?: number[];
   scLoss?: number;
   rolledById: string;
   rolledAt: string;
@@ -125,9 +139,26 @@ export interface PresenceUpdate {
   }>;
 }
 
+export type LogEntryType =
+  | 'CHAT_OOC' | 'CHAT_IC' | 'JUDGMENT' | 'HP_CHANGE' | 'SAN_CHANGE'
+  | 'MP_CHANGE' | 'SKILL_CHANGE' | 'CLOCK' | 'SYSTEM' | 'CUSTOM';
+
+/** 聊天类日志：交给 OOC/IC 聊天面板展示 */
+export const CHAT_LOG_TYPES: ReadonlySet<LogEntryType> = new Set(['CHAT_OOC', 'CHAT_IC']);
+
+/** 非聊天类日志：日志面板（掷骰/状态变更/系统消息） */
+export const NON_CHAT_LOG_TYPES: ReadonlyArray<LogEntryType> = [
+  'JUDGMENT', 'HP_CHANGE', 'SAN_CHANGE', 'MP_CHANGE',
+  'SKILL_CHANGE', 'CLOCK', 'SYSTEM', 'CUSTOM',
+];
+
+export function isChatLog(type: LogEntryType): boolean {
+  return CHAT_LOG_TYPES.has(type);
+}
+
 export interface LogEntryPayload {
   id: string;
-  type: 'CHAT_OOC' | 'CHAT_IC' | 'JUDGMENT' | 'HP_CHANGE' | 'SAN_CHANGE' | 'MP_CHANGE' | 'SKILL_CHANGE' | 'CLOCK' | 'SYSTEM' | 'CUSTOM';
+  type: LogEntryType;
   authorId?: string;
   characterId?: string;
   judgmentId?: string;

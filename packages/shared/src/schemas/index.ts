@@ -4,4 +4,5 @@ export * from './recruitment';
 export * from './judgment';
 export * from './clock';
 export * from './chat';
+export * from './log';
 export * from './settlement';
