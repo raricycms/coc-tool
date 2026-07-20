@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rollDie, rollDice, rollD10, parseDiceExpression, rollExpression, randomInt } from '../src/dice.js';
+import { rollDie, rollDice, rollD10, parseDiceExpression, rollExpression, rollExpressionDetailed, randomInt } from '../src/dice.js';
 
 describe('dice', () => {
   describe('rollDie', () => {
@@ -74,6 +74,40 @@ describe('dice', () => {
     });
     it('throws on bad range', () => {
       expect(() => randomInt(5, 3)).toThrow();
+    });
+  });
+
+  describe('rollExpressionDetailed', () => {
+    it('returns total + individual rolls + cleaned expr', () => {
+      const r = rollExpressionDetailed('1d6+1d3', () => 0); // 1d6 → 1, 1d3 → 1 → total 2
+      expect(r.total).toBe(2);
+      expect(r.rolls).toEqual([1, 1]);
+      expect(r.expr).toBe('1d6+1d3');
+    });
+
+    it('expands multi-dice: 2d6 → 2 entries', () => {
+      const r = rollExpressionDetailed('2d6+3', () => 0.5); // 4+4+3 = 11
+      expect(r.total).toBe(11);
+      expect(r.rolls).toHaveLength(3); // [4, 4, 3]
+      expect(r.rolls[0]).toBe(4);
+      expect(r.rolls[1]).toBe(4);
+      expect(r.rolls[2]).toBe(3);
+    });
+
+    it('handles plain number', () => {
+      expect(rollExpressionDetailed('5', () => 0)).toEqual({ total: 5, rolls: [5], expr: '5' });
+    });
+
+    it('strips whitespace and lowercases', () => {
+      const r = rollExpressionDetailed(' 1D6 ', () => 0);
+      expect(r.expr).toBe('1d6');
+      expect(r.total).toBe(1);
+    });
+
+    it('throws on empty / bad token', () => {
+      expect(() => rollExpressionDetailed('', () => 0)).toThrow();
+      expect(() => rollExpressionDetailed('abc', () => 0)).toThrow();
+      expect(() => rollExpressionDetailed('1d', () => 0)).toThrow();
     });
   });
 });
