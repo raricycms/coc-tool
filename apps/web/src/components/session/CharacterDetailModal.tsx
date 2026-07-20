@@ -52,14 +52,14 @@ export function CharacterDetailModal({
   if (!character) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="card my-8 flex w-full max-w-3xl flex-col"
+        className="card flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="-mx-5 -mt-5 mb-4 flex items-start justify-between border-b border-sky-200 px-5 py-3">
+        <header className="-mx-5 -mt-5 mb-4 flex shrink-0 items-start justify-between border-b border-sky-200 px-5 py-3">
           <div>
             <h2 className="text-lg font-bold text-ink">{character.name}</h2>
             {ownerUsername && (
@@ -69,7 +69,7 @@ export function CharacterDetailModal({
           <button className="btn-ghost text-xs" onClick={onClose}>关闭 ✕</button>
         </header>
 
-        <div className="space-y-5 overflow-y-auto pr-2 text-sm">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-2 text-sm">
           <DerivedStats char={character} />
           <PrimaryStats char={character} />
           <SkillsSection char={character} />

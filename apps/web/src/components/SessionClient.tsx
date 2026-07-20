@@ -255,8 +255,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     socketRef.current?.emit(SOCKET_EVENTS.OOC_SEND, { sessionId, content });
   }, [sessionId]);
 
-  const sendIC = useCallback((kind: 'desc' | 'dialogue', content: string, characterId?: string) => {
-    socketRef.current?.emit(SOCKET_EVENTS.IC_SEND, { sessionId, kind, content, characterId });
+  const sendIC = useCallback((kind: 'desc' | 'dialogue', content: string, characterId?: string, characterName?: string) => {
+    socketRef.current?.emit(SOCKET_EVENTS.IC_SEND, { sessionId, kind, content, characterId, characterName });
   }, [sessionId]);
 
   const createJudgment = useCallback((payload: any) => {

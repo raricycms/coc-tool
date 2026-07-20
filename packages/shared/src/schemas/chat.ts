@@ -8,6 +8,9 @@ export const ICSendSchema = z.object({
   kind: z.enum(['desc', 'dialogue']),
   content: z.string().min(1).max(2000),
   characterId: z.string().optional(),
+  // KP 在「角色发言」模式下可指定任意角色名（用于旁白 NPC）。
+  // PL 不传，服务端会用绑定角色的名字。
+  characterName: z.string().max(40).optional(),
 });
 
 export const CharacterUpdateHPRequestSchema = z.object({

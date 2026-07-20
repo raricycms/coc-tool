@@ -8,39 +8,55 @@ interface Props {
   onDice: (characterId: string, diceExpr: string, reason: string) => void;
 }
 
-const DICE_PRESETS = ['1d3', '1d4', '1d6', '1d8', '1d10', '2d6', '1d6+1d4'];
-
+/**
+ * HP 改动面板：
+ *  - 默认收起（只露一个按钮），跟「发布判定」一致
+ *  - 「变动值」一栏自动识别：
+ *      · 纯整数（如 -3）→ 手动扣 / 加血
+ *      · 含 d 的表达式（如 1d6、1d6+1d4）→ 走骰子扣血路径
+ */
 export function HpChangePanel({ characters, onChange, onDice }: Props) {
+  const [open, setOpen] = useState(false);
   const [targetId, setTargetId] = useState(characters[0]?.id ?? '');
-  const [delta, setDelta] = useState(0);
+  const [expr, setExpr] = useState('-1');
   const [reason, setReason] = useState('');
-  const [diceExpr, setDiceExpr] = useState('1d6');
 
   if (characters.length === 0) return null;
 
-  const submitManual = () => {
-    if (!targetId || delta === 0 || !reason.trim()) {
+  const submit = () => {
+    if (!targetId || !expr.trim() || !reason.trim()) {
       alert('需要填写变动值和原因');
       return;
     }
-    onChange(targetId, delta, reason.trim());
-    setDelta(0);
+    const trimmed = expr.trim();
+    if (/d/i.test(trimmed)) {
+      onDice(targetId, trimmed, reason.trim());
+    } else {
+      const delta = parseInt(trimmed, 10);
+      if (!Number.isFinite(delta) || delta === 0) {
+        alert('变动值必须是整数或骰子表达式（如 -3 或 1d6）');
+        return;
+      }
+      onChange(targetId, delta, reason.trim());
+    }
     setReason('');
   };
 
-  const submitDice = () => {
-    if (!targetId || !diceExpr.trim() || !reason.trim()) {
-      alert('需要填写骰子表达式和原因');
-      return;
-    }
-    onDice(targetId, diceExpr.trim(), reason.trim());
-    setReason('');
-  };
+  if (!open) {
+    return (
+      <button className="btn-primary w-full text-sm" onClick={() => setOpen(true)}>
+        ❤️ 修改 HP
+      </button>
+    );
+  }
+
+  const looksLikeDice = /d/i.test(expr);
 
   return (
-    <section className="card space-y-4">
-      <header>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">❤️ 修改 HP</h3>
+    <section className="card space-y-3">
+      <header className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">修改 HP</h3>
+        <button className="btn-ghost text-xs" onClick={() => setOpen(false)}>收起</button>
       </header>
 
       <div>
@@ -50,36 +66,40 @@ export function HpChangePanel({ characters, onChange, onDice }: Props) {
         </select>
       </div>
 
-      <div className="subpanel space-y-3">
-        <p className="text-xs font-semibold text-ink-soft">手动</p>
-        <div>
-          <label className="label text-xs">变动值（负数扣血）</label>
-          <input type="number" className="input" value={delta} onChange={(e) => setDelta(parseInt(e.target.value) || 0)} />
-        </div>
-        <div>
-          <label className="label text-xs">原因</label>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="被飞刀划伤 / 治疗法术…" />
-        </div>
-        <button className="btn-ghost w-full text-sm" onClick={submitManual}>应用</button>
+      <div>
+        <label className="label">
+          变动值
+          <span className="ml-2 text-[11px] font-normal text-ink-muted">
+            整数手动 / 含 d 走骰子
+          </span>
+        </label>
+        <input
+          className="input font-mono"
+          value={expr}
+          onChange={(e) => setExpr(e.target.value)}
+          placeholder="如 -3 或 1d6"
+        />
+        <p className="mt-1 text-[11px] text-ink-muted">
+          {looksLikeDice
+            ? `🎲 将对 ${expr} 掷骰，按结果扣 / 加血`
+            : '✍️ 按输入整数扣 / 加血（负数扣血）'}
+        </p>
       </div>
 
-      <div className="subpanel space-y-3">
-        <p className="text-xs font-semibold text-ink-soft">骰子扣血</p>
-        <div>
-          <label className="label text-xs">骰子表达式</label>
-          <input className="input font-mono" value={diceExpr} onChange={(e) => setDiceExpr(e.target.value.trim())} placeholder="1d6" />
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {DICE_PRESETS.map((p) => (
-            <button key={p} type="button" className="btn-ghost px-2 py-0.5 font-mono text-[11px]" onClick={() => setDiceExpr(p)}>{p}</button>
-          ))}
-        </div>
-        <div>
-          <label className="label text-xs">原因</label>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
-        </div>
-        <button className="btn-primary w-full text-sm" onClick={submitDice}>🎲 掷骰扣血</button>
+      <div>
+        <label className="label">原因</label>
+        <input
+          className="input"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="被飞刀划伤 / 治疗法术…"
+          maxLength={200}
+        />
       </div>
+
+      <button className="btn-primary w-full text-sm" onClick={submit}>
+        {looksLikeDice ? '🎲 掷骰并应用' : '应用'}
+      </button>
     </section>
   );
 }

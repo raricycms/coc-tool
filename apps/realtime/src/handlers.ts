@@ -143,7 +143,7 @@ export async function registerHandlers(io: Server) {
     });
 
     // ── IC send ──
-    s.on(SOCKET_EVENTS.IC_SEND, async (payload: { sessionId: string; kind: 'desc' | 'dialogue'; content: string; characterId?: string }) => {
+    s.on(SOCKET_EVENTS.IC_SEND, async (payload: { sessionId: string; kind: 'desc' | 'dialogue'; content: string; characterId?: string; characterName?: string }) => {
       try {
         const data = ICSendSchema.parse(payload);
         const member = await ensureMember(payload.sessionId, user.userId);
@@ -162,12 +162,13 @@ export async function registerHandlers(io: Server) {
               kind: data.kind,
               content: data.content,
               characterId: data.characterId,
+              characterName: data.characterName,
             }),
             inGameTime: clock?.inGameTime,
           },
         });
-        let characterName: string | undefined;
-        if (data.characterId) {
+        let characterName: string | undefined = data.characterName;
+        if (!characterName && data.characterId) {
           const c = await prisma.character.findUnique({ where: { id: data.characterId } });
           characterName = c?.name;
         }
@@ -485,13 +486,14 @@ export async function registerHandlers(io: Server) {
             ...clock,
           });
           // 写 CLOCK 日志
-          await prisma.logEntry.create({
+          const clockEntry = await prisma.logEntry.create({
             data: {
               sessionId,
               type: 'CLOCK',
               payload: JSON.stringify({ action: data, ...clock }),
             },
           });
+          io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(clockEntry));
         }
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });

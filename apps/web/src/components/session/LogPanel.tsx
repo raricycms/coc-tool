@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { LogEntryPayload } from '@coc-tools/shared';
 
 interface Member {
@@ -33,24 +33,58 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   extreme: '极难',
 };
 
+/**
+ * 日志面板：默认收起成一条「最近事件」摘要。
+ *  - 收起：仅显示「最新一条事件摘要」，不撑高页面
+ *  - 展开：可滚动的完整列表
+ */
 export function LogPanel({ logs, members }: Props) {
+  const [open, setOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollerRef.current) {
+    if (open && scrollerRef.current) {
       scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logs, open]);
 
   const findChar = (id?: string) => members.find((m) => m.character?.id === id)?.character;
+
+  const latest = logs.length > 0 ? logs[logs.length - 1] : null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="card flex w-full items-center justify-between text-left transition hover:border-macaron-300"
+      >
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
+            事件日志 · {logs.length}
+          </span>
+          {latest ? (
+            <div className="mt-1 truncate text-xs text-ink-muted">
+              最近：<LatestSummary entry={latest} findChar={findChar} />
+            </div>
+          ) : (
+            <div className="mt-1 text-xs text-ink-muted">暂无事件</div>
+          )}
+        </div>
+        <span className="ml-3 shrink-0 text-xs text-ink-muted">展开 ▾</span>
+      </button>
+    );
+  }
 
   return (
     <section className="card flex min-h-0 flex-1 flex-col">
       <header className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">事件日志</h3>
-        <span className="text-[11px] text-ink-muted">{logs.length} 条</span>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
+          事件日志 · {logs.length}
+        </h3>
+        <button className="btn-ghost text-xs" onClick={() => setOpen(false)}>收起 ▴</button>
       </header>
-      <div ref={scrollerRef} className="flex-1 space-y-1 overflow-y-auto text-xs min-h-0">
+      <div ref={scrollerRef} className="flex-1 space-y-1 overflow-y-auto pr-1 text-xs min-h-0">
         {logs.length === 0 ? (
           <p className="py-6 text-center text-ink-muted">暂无</p>
         ) : (
@@ -69,6 +103,26 @@ export function LogPanel({ logs, members }: Props) {
   );
 }
 
+function LatestSummary({ entry, findChar }: { entry: LogEntryPayload; findChar: (id?: string) => Member['character'] | undefined }) {
+  const p = entry.payload as any;
+  switch (entry.type) {
+    case 'JUDGMENT':
+      return <>{entry.type} · {p.skillName ?? '?'}</>;
+    case 'HP_CHANGE':
+      return <>HP 变动 · {p.delta ?? 0}</>;
+    case 'SAN_CHANGE':
+      return <>SAN 变动 · {p.delta ?? 0}</>;
+    case 'DICE_ROLL':
+      return <>🎲 {p.title ?? '掷骰'}</>;
+    case 'CLOCK':
+      return <>⏰ 时钟调整</>;
+    case 'SYSTEM':
+      return <>系统事件</>;
+    default:
+      return <>{entry.type}</>;
+  }
+}
+
 function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar: (id?: string) => Member['character'] | undefined }) {
   const p = entry.payload as any;
   switch (entry.type) {
@@ -81,7 +135,7 @@ function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar:
     case 'DICE_ROLL':
       return <DiceRollLogLine payload={p} />;
     case 'CLOCK':
-      return <div>⏰ 时钟 {p.action?.action ?? ''} → {p.inGameTime ?? ''} {p.inGameDate ?? ''}</div>;
+      return <ClockLogLine payload={p} />;
     case 'SYSTEM':
       return <div className="text-ink-soft">⚙ {p.event ?? JSON.stringify(p)}</div>;
     default:
@@ -105,6 +159,23 @@ function DiceRollLogLine({ payload }: { payload: any }) {
       {roller && <span className="ml-1 text-[10px] text-ink-muted">by @{roller}</span>}
       {' · '}<span className="font-mono">{rollDetail}</span>
       {description && <div className="ml-4 mt-0.5 italic text-ink-soft">↳ {description}</div>}
+    </div>
+  );
+}
+
+function ClockLogLine({ payload }: { payload: any }) {
+  const action = payload.action ?? {};
+  const verb =
+    action.action === 'start' ? '开始' :
+    action.action === 'pause' ? '暂停' :
+    action.action === 'setRate' ? `调整倍率 ${action.rate}×` :
+    action.action === 'addTime' ? `时间 ${action.deltaMinutes > 0 ? '+' : ''}${action.deltaMinutes} 分钟` :
+    action.action === 'setTime' ? '设定时间' :
+    '调整';
+  return (
+    <div>
+      ⏰ <b>时钟</b> · {verb}
+      <span className="ml-1 font-mono text-ink-muted">{payload.inGameTime ?? ''} {payload.inGameDate ?? ''}</span>
     </div>
   );
 }
