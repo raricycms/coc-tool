@@ -43,6 +43,7 @@ interface Props {
 
 export function SessionClient({ sessionId, role, currentUserId, initialClock, initialMembers }: Props) {
   const [connected, setConnected] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [clock, setClock] = useState(initialClock);
   const [logs, setLogs] = useState<LogEntryPayload[]>([]);
@@ -57,6 +58,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   useEffect(() => {
     let cancelled = false;
     let socket: Awaited<ReturnType<typeof getSocket>> | null = null;
+    let onConnect: (() => void) | null = null;
+    let onDisconnect: ((reason: string) => void) | null = null;
+    let onConnectError: ((err: Error) => void) | null = null;
 
     getSocket().then((s) => {
       if (cancelled) {
@@ -66,15 +70,25 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       socket = s;
       socketRef.current = s;
 
-      const onConnect = () => {
+      onConnect = () => {
         setConnected(true);
+        setConnectError(null);
         s.emit(SOCKET_EVENTS.JOIN_SESSION, { sessionId });
         s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId });
       };
-      const onDisconnect = () => setConnected(false);
+      onDisconnect = (reason: string) => {
+        setConnected(false);
+        setConnectError(`连接已断开（${reason}）`);
+      };
+      onConnectError = (err: Error) => {
+        setConnected(false);
+        setConnectError(`连接失败：${err.message}`);
+        console.error('[SessionClient] connect_error:', err.message, err);
+      };
 
       s.on('connect', onConnect);
       s.on('disconnect', onDisconnect);
+      s.on('connect_error', onConnectError);
       if (s.connected) onConnect();
 
       s.on(SOCKET_EVENTS.OOC_MESSAGE, (m: OOCMessage) => {
@@ -126,8 +140,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     return () => {
       cancelled = true;
       if (!socket) return;
-      socket.off('connect');
-      socket.off('disconnect');
+      if (onConnect) socket.off('connect', onConnect);
+      if (onDisconnect) socket.off('disconnect', onDisconnect as any);
+      if (onConnectError) socket.off('connect_error', onConnectError);
       socket.off(SOCKET_EVENTS.OOC_MESSAGE);
       socket.off(SOCKET_EVENTS.IC_MESSAGE);
       socket.off(SOCKET_EVENTS.LOG_ENTRY);
@@ -172,7 +187,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     <div className="flex-1 flex flex-col">
       {!connected && (
         <div className="bg-red-500/20 border-b border-red-500 text-center text-sm py-1">
-          连接已断开，正在重连…
+          {connectError ?? '连接已断开，正在重连…'}
         </div>
       )}
 
