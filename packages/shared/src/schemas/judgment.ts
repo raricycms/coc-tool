@@ -38,6 +38,17 @@ export const HpDiceRollSchema = z.object({
   reason: z.string().min(1).max(200),
 });
 
+/**
+ * KP 公开掷骰：标题（必填）+ 说明（可选）+ 骰子表达式。
+ * 结果以 DICE_ROLL 日志推送给 session 全员。
+ */
+export const DiceRollCreateSchema = z.object({
+  title: z.string().min(1).max(60),
+  description: z.string().max(200).optional(),
+  diceExpr: DiceExpr,
+});
+
 export type JudgmentCreate = z.infer<typeof JudgmentCreateSchema>;
 export type JudgmentRoll = z.infer<typeof JudgmentRollSchema>;
 export type HpDiceRoll = z.infer<typeof HpDiceRollSchema>;
+export type DiceRollCreate = z.infer<typeof DiceRollCreateSchema>;

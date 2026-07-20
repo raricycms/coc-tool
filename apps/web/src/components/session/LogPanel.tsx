@@ -75,6 +75,8 @@ function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar:
       return <HpChangeLogLine entry={entry} payload={p} findChar={findChar} />;
     case 'SAN_CHANGE':
       return <SanChangeLogLine entry={entry} payload={p} findChar={findChar} />;
+    case 'DICE_ROLL':
+      return <DiceRollLogLine payload={p} />;
     case 'CLOCK':
       return <div>⏰ 时钟 {p.action?.action ?? ''} → {p.inGameTime ?? ''} {p.inGameDate ?? ''}</div>;
     case 'SYSTEM':
@@ -82,6 +84,31 @@ function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar:
     default:
       return <div className="text-ink-100/30">[{entry.type}] {JSON.stringify(p)}</div>;
   }
+}
+
+/**
+ * KP 公开掷骰日志：
+ *   🎲 [标题] · 1d100=42
+ *      说明（可选）
+ */
+function DiceRollLogLine({ payload }: { payload: any }) {
+  const title = payload.title ?? '掷骰';
+  const expr = payload.diceExpr ?? '';
+  const rolls: number[] = payload.diceRolls ?? [];
+  const total = payload.diceTotal;
+  const description = payload.description ?? '';
+  const roller = payload.rolledByUsername ?? '';
+  const rollDetail = rolls.length
+    ? `${expr}=${rolls.join('+')}=${total}`
+    : `${expr}=${total ?? '?'}`;
+  return (
+    <div>
+      🎲 <b>{title}</b>
+      {roller && <span className="text-ink-100/40 text-[10px] ml-1">by @{roller}</span>}
+      {' · '}<span className="font-mono">{rollDetail}</span>
+      {description && <div className="text-ink-100/50 italic ml-4 mt-0.5">↳ {description}</div>}
+    </div>
+  );
 }
 
 /**

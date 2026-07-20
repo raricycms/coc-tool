@@ -10,6 +10,7 @@ import type {
   JudgmentCreateSchema,
   JudgmentRollSchema,
   HpDiceRollSchema,
+  DiceRollCreateSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
 } from './schemas';
@@ -24,6 +25,7 @@ export const SOCKET_EVENTS = {
   CLOCK_CONTROL: 'clock:control',
   HP_CHANGE: 'hp:change',
   HP_DICE_ROLL: 'hp:dice:roll',
+  DICE_ROLL: 'dice:roll',
   JOIN_SESSION: 'session:join',
   LEAVE_SESSION: 'session:leave',
   LOG_HISTORY: 'log:history',
@@ -53,6 +55,7 @@ export type JudgmentRollPayload = z.infer<typeof JudgmentRollSchema>;
 export type ClockControlPayload = z.infer<typeof ClockControlSchema>;
 export type LogHistoryRequestPayload = z.infer<typeof LogHistoryRequestSchema>;
 export type HpDiceRollPayload = z.infer<typeof HpDiceRollSchema>;
+export type DiceRollCreatePayload = z.infer<typeof DiceRollCreateSchema>;
 
 // ── 推送给客户端的消息 ──
 
@@ -145,7 +148,7 @@ export interface PresenceUpdate {
 
 export type LogEntryType =
   | 'CHAT_OOC' | 'CHAT_IC' | 'JUDGMENT' | 'HP_CHANGE' | 'SAN_CHANGE'
-  | 'MP_CHANGE' | 'SKILL_CHANGE' | 'CLOCK' | 'SYSTEM' | 'CUSTOM';
+  | 'MP_CHANGE' | 'SKILL_CHANGE' | 'CLOCK' | 'SYSTEM' | 'CUSTOM' | 'DICE_ROLL';
 
 /** 聊天类日志：交给 OOC/IC 聊天面板展示 */
 export const CHAT_LOG_TYPES: ReadonlySet<LogEntryType> = new Set(['CHAT_OOC', 'CHAT_IC']);
@@ -153,7 +156,7 @@ export const CHAT_LOG_TYPES: ReadonlySet<LogEntryType> = new Set(['CHAT_OOC', 'C
 /** 非聊天类日志：日志面板（掷骰/状态变更/系统消息） */
 export const NON_CHAT_LOG_TYPES: ReadonlyArray<LogEntryType> = [
   'JUDGMENT', 'HP_CHANGE', 'SAN_CHANGE', 'MP_CHANGE',
-  'SKILL_CHANGE', 'CLOCK', 'SYSTEM', 'CUSTOM',
+  'SKILL_CHANGE', 'CLOCK', 'SYSTEM', 'CUSTOM', 'DICE_ROLL',
 ];
 
 export function isChatLog(type: LogEntryType): boolean {

@@ -10,6 +10,7 @@ import {
   JudgmentCreateSchema,
   JudgmentRollSchema,
   HpDiceRollSchema,
+  DiceRollCreateSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
   SOCKET_EVENTS,
@@ -563,6 +564,38 @@ export async function registerHandlers(io: Server) {
           diceTotal: roll.total,
           hpAfter,
           reason: data.reason,
+        });
+        io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    // ── 公开掷骰 (KP only) ──
+    // KP 投一个骰子，结果以 DICE_ROLL 日志推给全员；不做任何角色状态变更。
+    s.on(SOCKET_EVENTS.DICE_ROLL, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以公开掷骰');
+        const data = DiceRollCreateSchema.parse(raw);
+
+        const roll = rollExpressionDetailed(data.diceExpr);
+        const clock = getCurrentClock(raw.sessionId);
+        const entry = await prisma.logEntry.create({
+          data: {
+            sessionId: raw.sessionId,
+            type: 'DICE_ROLL',
+            authorId: user.userId,
+            payload: JSON.stringify({
+              title: data.title,
+              description: data.description ?? null,
+              diceExpr: roll.expr,
+              diceRolls: roll.rolls,
+              diceTotal: roll.total,
+              rolledByUsername: user.username,
+            }),
+            inGameTime: clock?.inGameTime,
+          },
         });
         io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
       } catch (err) {

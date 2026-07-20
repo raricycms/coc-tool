@@ -15,6 +15,7 @@ import { PresenceBar } from './session/PresenceBar';
 import { JudgmentCreator } from './session/JudgmentCreator';
 import { JudgmentQueue } from './session/JudgmentQueue';
 import { HpChangePanel } from './session/HpChangePanel';
+import { DiceRoller } from './session/DiceRoller';
 import { CharacterCardsPanel } from './session/CharacterCardsPanel';
 
 interface Member {
@@ -298,6 +299,10 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     socketRef.current?.emit(SOCKET_EVENTS.HP_DICE_ROLL, { sessionId, characterId, diceExpr, reason });
   }, [sessionId]);
 
+  const rollDice = useCallback((title: string, description: string | undefined, diceExpr: string) => {
+    socketRef.current?.emit(SOCKET_EVENTS.DICE_ROLL, { sessionId, title, description, diceExpr });
+  }, [sessionId]);
+
   return (
     <div className="flex-1 flex flex-col">
       {!connected && (
@@ -366,6 +371,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               })}
               onCreate={createJudgment}
             />
+          )}
+          {role === 'KP' && (
+            <DiceRoller onRoll={rollDice} />
           )}
           <JudgmentQueue
             judgments={pendingJudgments}
