@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DEFAULT_SKILLS, rollDie } from '@coc-tools/coc-rules';
 import { useFieldErrors } from '@/lib/useFieldErrors';
@@ -87,6 +87,18 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // 列表 ref：新增后自动滚到底部，让刚加的那条可见
+  const skillsListRef = useRef<HTMLUListElement>(null);
+  const weaponsListRef = useRef<HTMLUListElement>(null);
+  const equipmentListRef = useRef<HTMLUListElement>(null);
+
+  const scrollListToBottom = (ref: React.RefObject<HTMLElement | null>) => {
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
 
   const randomPrimary = () => {
     setPrimary(rollPrimary());
@@ -263,7 +275,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
             <p className="mt-1 text-sm text-ink-soft">勾选「克苏鲁神话」会让该技能以紫色显示。</p>
           </header>
 
-          <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
+          <ul ref={skillsListRef} className="max-h-96 divide-y divide-sky-100 overflow-y-auto rounded-2xl border border-sky-200">
             {skills.map((s, i) => (
               <li key={i} className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <FieldError error={get(`skills.${i}.name`)}>
@@ -330,6 +342,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
                   if (newSkill.name) {
                     setSkills([...skills, newSkill]);
                     setNewSkill({ name: '', value: 50 });
+                    scrollListToBottom(skillsListRef);
                   }
                 }}
               >
@@ -351,7 +364,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
             {weapons.length === 0 ? (
               <p className="text-sm text-ink-soft">还没添加武器。</p>
             ) : (
-              <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
+              <ul ref={weaponsListRef} className="max-h-96 divide-y divide-sky-100 overflow-y-auto rounded-2xl border border-sky-200">
                 {weapons.map((w, i) => (
                   <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
                     <span className="flex-1 font-semibold text-ink">{w.name}</span>
@@ -389,6 +402,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
                   if (newWeapon.name) {
                     setWeapons([...weapons, newWeapon]);
                     setNewWeapon({ name: '', skill: '', damage: '', range: '' });
+                    scrollListToBottom(weaponsListRef);
                   }
                 }}>
                   ＋ 添加武器
@@ -406,7 +420,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
             {equipment.length === 0 ? (
               <p className="text-sm text-ink-soft">还没添加装备。</p>
             ) : (
-              <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
+              <ul ref={equipmentListRef} className="max-h-96 divide-y divide-sky-100 overflow-y-auto rounded-2xl border border-sky-200">
                 {equipment.map((e, i) => (
                   <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
                     <span className="flex-1 font-semibold text-ink">{e.name}</span>
@@ -438,6 +452,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
                     if (newEquip.name) {
                       setEquipment([...equipment, newEquip]);
                       setNewEquip({ name: '', quantity: 1 });
+                      scrollListToBottom(equipmentListRef);
                     }
                   }}
                 >
