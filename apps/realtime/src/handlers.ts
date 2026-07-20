@@ -239,7 +239,9 @@ export async function registerHandlers(io: Server) {
               skillName: data.skillName,
               value: skillValue,
               hp: char.hpCurrent,
+              hpMax: char.hpMax,
               san: char.sanCurrent,
+              sanMax: char.sanMax,
             }),
           },
         });
@@ -379,6 +381,7 @@ export async function registerHandlers(io: Server) {
                 payload: JSON.stringify({
                   delta: -scLoss,
                   sanAfter,
+                  sanMax: char.sanMax,
                   reason: `SAN check ${sanPassed ? '成功' : '失败'}（${SUCCESS_LABELS[result.successLevel]} · ${lossDesc}）`,
                 }),
                 inGameTime: clock?.inGameTime,
@@ -480,7 +483,7 @@ export async function registerHandlers(io: Server) {
             sessionId,
             type: 'HP_CHANGE',
             characterId,
-            payload: JSON.stringify({ delta, hpAfter, reason }),
+            payload: JSON.stringify({ delta, hpAfter, hpMax: char.hpMax, reason }),
             inGameTime: clock?.inGameTime,
           },
         });
