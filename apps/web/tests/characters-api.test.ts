@@ -94,7 +94,7 @@ describe('characters API', () => {
       url: 'http://localhost/api/characters', method: 'POST',
       body: {
         name: '林远',
-        primary: { ...VALID_PRIMARY, str: 200 },  // 越界
+        primary: { ...VALID_PRIMARY, str: 1000 },  // 越界
         skills: [],
       },
     });
