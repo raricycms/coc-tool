@@ -110,6 +110,30 @@
 
 ---
 
-## 11. 明确的 v0.2+（预留，非当前欠账）
+## 11. 用户反馈的具体待办（2026-07-20）
+
+按需求逐条登记：
+
+1. **基础数值输入从三列网格改每行一条** — `apps/web/src/components/CharacterForm.tsx:202` 第 2 步「属性」用了 `grid grid-cols-3 gap-3`，九大属性分三行三列，密集不易点。改为每条一行的纵向布局。
+2. **可以修改车卡** — `PATCH /api/characters/[id]` 已实现，但 `/characters/[id]` 详情页**无页内编辑表单**（静态分区展示），也没有跳转去 `/characters/[id]/edit` 的入口。需要详情页「编辑」按钮 + 编辑表单（按基础 / 属性 / 技能 / 装备 / 背景 分步或单页）。
+3. **数值可以超过 100** — `packages/shared/src/schemas/character.ts` 中 `PrimaryStatsSchema` 与 `SkillSchema` 的 `max(100)` 限制太死；`CharacterForm.tsx:206` 的 `<input max={100}>` 也写死了。八维 / 技能值允许 > 100（如高阶技能成长、神话知识），需把 zod 与表单输入上限放宽。
+4. **新增技能后应可修改数值** — 当前 `CharacterForm` 第 3 步「技能」可编辑列表；需要确认新增技能行（点「+ 添加技能」后）能立即编辑数值（非只读 + 保存后才生效）。如果当前是只读新增，要改成可即时编辑。
+5. **长期保存登录** — 当前 session cookie `maxAge: 7 * 24 * 3600`（7 天）。如需「记住我」长期保持，要做：单独的「记住我」勾选 → 写更长寿 cookie（如 90 天 / 1 年），同时服务端允许 refresh。JWT 本身无续期机制，需要在服务端加 refresh 端点 + cookie 续期逻辑。
+6. **算法 vs `docs/技能.md` 对齐** — 教程是「简易版」规则，与代码现行的「CoC 7e 十位制」派生**不一致**：
+
+   | 量 | 教程 | 代码（`packages/coc-rules/src/attributes.ts`） | 是否一致 |
+   |---|---|---|---|
+   | HP | `(CON + SIZ) // 10` | `Math.ceil((con + siz) / 10)` | ✓（ceil vs floor 在偶数时差 1，需统一） |
+   | MOV | 人类固定 8 | `computeMov(DEX, STR, SIZ, age)`：DEX 基础 + STR<SIZ -1 + 年龄分档减 1~5 | ❌ |
+   | SAN_max | 等于 POW | `pow * 5` | ❌ |
+   | MP | `POW // 5` | `Math.ceil(pow / 5)` | ✓（同上 ceil vs floor） |
+   | 幸运 | 3d6 × 5 | `roll3D6x5() * 5` | ✓ |
+   | 伤害加成 / build | 给出对照表 2-64:-2 / 65-84:-1 / 85-124:0 / 125-164:+1d4 / 165-204:+1d6 | `lookupDamageBonus(build)` 表 2-64:-2 / 65-84:-1 / 85-124:0 / 125-164:+1d4 / 165+:+1d6 | ✓（无 +2d6 区间一致） |
+
+   **结论**：MOV 与 SAN_max 与教程不一致。要么按教程改代码，要么在 `ARCHITECTURE.md` / `remaining-work.md` 标注「代码走 CoC 7e 通用规则，与项目自带简易教程不同」并保留双套说明。
+
+---
+
+## 12. 明确的 v0.2+（预留，非当前欠账）
 
 剧本模版 / 剧情节点、附件（图片 / 音频）、公开团 / 私人团可见性与 `link` 分享 token、PL 黑名单、车卡导出 PDF/JSON 与跨平台导入、WS 加密 / 录像回放、移动端 PWA、i18n（next-intl）、站内通知中心、用户主页、剧本市场、`/settings` 页（改名 / 改密 / 绑定解绑 raricy / 注销账号）、管理员硬删。
