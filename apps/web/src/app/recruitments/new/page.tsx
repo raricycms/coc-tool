@@ -42,7 +42,7 @@ export default function NewRecruitmentPage() {
       }
       return;
     }
-    router.push(`/recruitments/${j.data.id}/manage`);
+    router.push(`/recruitments/${j.data.id}`);
   };
 
   return (

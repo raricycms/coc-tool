@@ -137,7 +137,7 @@ export default async function DashboardPage() {
             <ul className="card divide-y divide-sky-200 p-0">
               {myRecruitments.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/recruitments/${r.id}/manage`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                  <Link href={`/recruitments/${r.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-ink">{r.title}</div>
                       <div className="text-xs text-ink-soft">
