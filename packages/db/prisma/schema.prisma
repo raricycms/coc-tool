@@ -292,6 +292,12 @@ model LogEntry {
 
 // ───────────────────────────── Judgment ─────────────────────────────
 // status: PENDING | ROLLED | RESOLVED | CANCELLED
+//
+// SAN 损失字段：
+//   - scMin / scMax  (Int?): 旧版"损失范围"，已被 scSuccessExpr/scFailureExpr 取代
+//   - scSuccessExpr / scFailureExpr (String?): 骰子表达式
+//       成功按 scSuccessExpr 扣（如 "1d3"），失败按 scFailureExpr 扣（如 "1d6"）。
+//       空串或解析失败视为不扣。详细迁移见 docs/database-migrations.md。
 
 model Judgment {
   id             String         @id @default(cuid())
@@ -303,8 +309,14 @@ model Judgment {
   skillName      String
   difficulty     String         @default("regular")
   bonusDice      Int            @default(0)
+  /// @deprecated 已被 scSuccessExpr/scFailureExpr 取代，新代码不要写入。
   scMin          Int?
+  /// @deprecated 已被 scSuccessExpr/scFailureExpr 取代，新代码不要写入。
   scMax          Int?
+  /// SAN check 成功时的损失骰表达式（如 "1d3" / "0"）。
+  scSuccessExpr  String?
+  /// SAN check 失败时的损失骰表达式（如 "1d6"）。
+  scFailureExpr  String?
 
   status         String         @default("PENDING")
   rolledById     String?
@@ -315,6 +327,12 @@ model Judgment {
   unit           Int?
   successLevel   String?
   scLoss         Int?
+  /// SAN check：是否通过（1d100 <= sanValue 且不是 fumble）
+  sanPassed      Boolean?
+  /// SAN check：实际使用的骰子表达式原文
+  sanLossExpr    String?
+  /// SAN check：实际投出的骰子值（JSON 数组）
+  sanLossRolls   String?
   targetSnapshot String?        // JSON
   note           String?
 
