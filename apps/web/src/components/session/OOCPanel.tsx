@@ -27,12 +27,12 @@ export function OOCPanel({ messages, onSend, canSend, currentUsername }: Props) 
   };
 
   return (
-    <div className="card flex min-h-0 flex-1 flex-col">
+    <div className="card flex min-h-0 flex-col">
       <header className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画外 · OOC</h3>
         <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
       </header>
-      <div ref={scrollerRef} className="flex-1 space-y-2 overflow-y-auto text-sm min-h-0">
+      <div ref={scrollerRef} className="h-[480px] space-y-2 overflow-y-auto overflow-x-hidden text-sm lg:h-[640px]">
         {messages.length === 0 ? (
           <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (

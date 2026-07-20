@@ -51,13 +51,13 @@ export function LogPanel({ logs, members }: Props) {
   const findChar = (id?: string) => members.find((m) => m.character?.id === id)?.character;
 
   return (
-    <section className="card flex min-h-0 flex-1 flex-col">
+    <section className="card flex min-h-0 flex-col">
       <header className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
           事件日志 · {logs.length}
         </h3>
       </header>
-      <div ref={scrollerRef} className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs min-h-0">
+      <div ref={scrollerRef} className="h-[480px] space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs lg:h-[640px]">
         {logs.length === 0 ? (
           <p className="py-6 text-center text-ink-muted">暂无</p>
         ) : (
