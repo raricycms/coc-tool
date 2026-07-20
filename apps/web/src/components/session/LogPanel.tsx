@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import type { LogEntryPayload } from '@coc-tools/shared';
 
 interface Member {
@@ -34,47 +34,21 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 };
 
 /**
- * 日志面板：默认收起成一条「最近事件」摘要。
- *  - 收起：仅显示「最新一条事件摘要」，不撑高页面
- *  - 展开：可滚动的完整列表
+ * 事件日志：默认就是一整列可滚动列表（与聊天一致）。
+ *  - 新事件追加在底部，自动滚到底部
+ *  - 向上滚动可查看历史；不撑高页面
  */
 export function LogPanel({ logs, members }: Props) {
-  const [open, setOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
+  // 新事件进来：滚到底部，让 KP/PL 看到刚发生的事
   useEffect(() => {
-    if (open && scrollerRef.current) {
+    if (scrollerRef.current) {
       scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
     }
-  }, [logs, open]);
+  }, [logs]);
 
   const findChar = (id?: string) => members.find((m) => m.character?.id === id)?.character;
-
-  const latest = logs.length > 0 ? logs[logs.length - 1] : null;
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="card flex w-full items-center justify-between text-left transition hover:border-macaron-300"
-      >
-        <div className="min-w-0 flex-1">
-          <span className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
-            事件日志 · {logs.length}
-          </span>
-          {latest ? (
-            <div className="mt-1 truncate text-xs text-ink-muted">
-              最近：<LatestSummary entry={latest} findChar={findChar} />
-            </div>
-          ) : (
-            <div className="mt-1 text-xs text-ink-muted">暂无事件</div>
-          )}
-        </div>
-        <span className="ml-3 shrink-0 text-xs text-ink-muted">展开 ▾</span>
-      </button>
-    );
-  }
 
   return (
     <section className="card flex min-h-0 flex-1 flex-col">
@@ -82,45 +56,26 @@ export function LogPanel({ logs, members }: Props) {
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
           事件日志 · {logs.length}
         </h3>
-        <button className="btn-ghost text-xs" onClick={() => setOpen(false)}>收起 ▴</button>
       </header>
-      <div ref={scrollerRef} className="flex-1 space-y-1 overflow-y-auto pr-1 text-xs min-h-0">
+      <div ref={scrollerRef} className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs min-h-0">
         {logs.length === 0 ? (
           <p className="py-6 text-center text-ink-muted">暂无</p>
         ) : (
           logs.map((e) => (
-            <div key={e.id} className="border-l-2 border-sky-200 pl-2.5">
-              <div className="text-[10px] text-ink-muted">
+            <div key={e.id} className="min-w-0 border-l-2 border-sky-200 pl-2.5">
+              <div className="break-words text-[10px] text-ink-muted">
                 {new Date(e.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
                 {e.inGameTime && ` · ⏰ ${e.inGameTime}`}
               </div>
-              <LogEntryRender entry={e} findChar={findChar} />
+              <div className="break-words">
+                <LogEntryRender entry={e} findChar={findChar} />
+              </div>
             </div>
           ))
         )}
       </div>
     </section>
   );
-}
-
-function LatestSummary({ entry, findChar }: { entry: LogEntryPayload; findChar: (id?: string) => Member['character'] | undefined }) {
-  const p = entry.payload as any;
-  switch (entry.type) {
-    case 'JUDGMENT':
-      return <>{entry.type} · {p.skillName ?? '?'}</>;
-    case 'HP_CHANGE':
-      return <>HP 变动 · {p.delta ?? 0}</>;
-    case 'SAN_CHANGE':
-      return <>SAN 变动 · {p.delta ?? 0}</>;
-    case 'DICE_ROLL':
-      return <>🎲 {p.title ?? '掷骰'}</>;
-    case 'CLOCK':
-      return <>⏰ 时钟调整</>;
-    case 'SYSTEM':
-      return <>系统事件</>;
-    default:
-      return <>{entry.type}</>;
-  }
 }
 
 function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar: (id?: string) => Member['character'] | undefined }) {
