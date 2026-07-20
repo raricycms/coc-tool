@@ -36,8 +36,10 @@
 │   ├── db/              # Prisma schema 与客户端
 │   └── shared/          # 前后端共享事件类型和 Zod schemas
 ├── docs/
+│   ├── ARCHITECTURE.md  # 项目架构说明（as-built）
+│   ├── deployment.md    # 部署说明
 │   ├── oauth.md         # raricy OAuth 协议说明
-│   └── plan/            # 产品、架构和实现规划
+│   └── plan/            # remaining-work.md：未完成工作汇总
 ├── .env.example
 └── package.json         # npm workspaces 根配置
 ```
@@ -128,14 +130,10 @@ npm run dev:realtime
 
 ## 文档
 
+- [项目架构说明（as-built）](docs/ARCHITECTURE.md)
 - [部署指南](docs/deployment.md)
-- [项目总览与术语](docs/plan/00-README.md)
-- [技术栈与决策](docs/plan/01-tech-stack.md)
-- [系统架构](docs/plan/02-architecture.md)
-- [数据库设计](docs/plan/03-database-schema.md)
-- [认证设计](docs/plan/04-auth.md)
 - [raricy OAuth 说明](docs/oauth.md)
-- [实施阶段](docs/plan/10-implementation-phases.md)
+- [未完成工作汇总](docs/plan/remaining-work.md)
 
 ## 安全提示
 

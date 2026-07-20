@@ -258,7 +258,7 @@ sudo systemctl restart coc-realtime coc-web
 
 - realtime 自带 `GET /health`：反代后 `https://coc.example.com/realtime-health`，挂监控即可。
 - web 没有公开 `/health`，可以用外部 HTTP 探针打首页 `200`。
-- 当前 captcha / 限频是**单进程内存**（`Map`）。多实例横向扩展前必须迁到 Redis（已写在 [`docs/plan/02-architecture.md` 的待办里]）。
+- 当前 captcha / 限频是**单进程内存**（`Map`）。多实例横向扩展前必须迁到 Redis（见 [`ARCHITECTURE.md`](./ARCHITECTURE.md) 与 [`plan/remaining-work.md`](./plan/remaining-work.md)）。
 
 ---
 
