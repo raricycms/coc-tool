@@ -6,7 +6,39 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { prisma } from '@coc-tools/db';
 
-const SECRET = () => new TextEncoder().encode(process.env.SESSION_SECRET || 'dev-secret-please-replace-this-32-bytes');
+/**
+ * 与 realtime 共享的 JWT 签名密钥。
+ *
+ * 启动期硬校验：必须存在且不能是仓库自带的 dev 占位串。占位串意味着
+ * 「忘了 set -a; source .env; set +a」，会导致 web 签的 JWT 在 realtime
+ * 端校验失败 → 浏览器「连接已断开」死循环。测试环境（vitest 注入
+ * SESSION_SECRET）跳过。
+ */
+const PLACEHOLDER_SECRET = 'dev-secret-please-replace-this-32-bytes';
+(function assertSessionSecret() {
+  const s = process.env.SESSION_SECRET;
+  if (s && s !== PLACEHOLDER_SECRET) return;
+  if (process.env.NODE_ENV === 'test') return;
+  // 在 module 顶层用 console.error 抛错，让 Next.js dev 启动时的编译错
+  // 提示直接露在终端里。
+  // eslint-disable-next-line no-console
+  console.error(
+    '\n' +
+    '┌──────────────────────────────────────────────────────────────────┐\n' +
+    '│ web: SESSION_SECRET 未设置或仍是仓库占位串                        │\n' +
+    '│                                                                  │\n' +
+    '│ 这会导致 realtime 校验 JWT 失败、浏览器「连接已断开」死循环。     │\n' +
+    '│ 启动前请执行：                                                   │\n' +
+    '│     set -a && source .env && set +a && npm run dev:web           │\n' +
+    '│                                                                  │\n' +
+    '│ 或者在 systemd 单元里加：                                         │\n' +
+    '│     EnvironmentFile=/opt/coc-tools/.env                          │\n' +
+    '└──────────────────────────────────────────────────────────────────┘\n',
+  );
+  throw new Error('SESSION_SECRET missing or placeholder; see console error above.');
+})();
+
+const SECRET = () => new TextEncoder().encode(process.env.SESSION_SECRET!);
 const COOKIE_NAME = 'session';
 const COOKIE_MAX_AGE = 7 * 24 * 3600;
 

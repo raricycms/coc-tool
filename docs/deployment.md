@@ -267,6 +267,8 @@ sudo systemctl restart coc-realtime coc-web
 | 症状 | 看哪里 | 修复 |
 | --- | --- | --- |
 | 进入跑团页一直显示「连接已断开，正在重连…」 | realtime 日志：`unauthorized: no token` | 没跨源：检查 nginx 是否漏配 `/socket.io/`；跨源：检查 `WEB_ORIGIN` 和 `NEXT_PUBLIC_WS_URL` 是否匹配 |
+| 同上，但 realtime 日志是 `unauthorized: invalid token` | 两端 `SESSION_SECRET` 不一致（web 签的 JWT 在 realtime 验不过） | 两端都用 `set -a && source .env && set +a` 启动，或在 systemd 单元加 `EnvironmentFile=/opt/coc-tools/.env`。运行 `node apps/web/tests/e2e/ws-flow.mjs` 会先对账 fingerprint 并直接报出哪一端用了不同的密钥 |
+| 启动 realtime 立刻看到大段红色边框的「启动被拒绝」 | SESSION_SECRET 未设置或仍是仓库占位串 | 这是有意为之的 fail-loud。按提示 `set -a && source .env && set +a` 再启动 |
 | 登录后 Cookie 没生效，跳回 `/login` | `apps/web` 日志 + 浏览器 Cookie 面板 | `WEB_ORIGIN` 是否 `https://`；若 `http` 部署又想让 Cookie 带 Secure，浏览器会静默丢弃 |
 | 注册报 500 | web 日志 `Environment variable not found: DATABASE_URL` | systemd 没读 `.env`，给单元加 `EnvironmentFile=` |
 | 时钟升级后回退 | realtime 日志 `session not found` | 数据库迁移没跑：`npm run db:migrate` |

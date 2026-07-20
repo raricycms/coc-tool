@@ -9,16 +9,26 @@
  *   2) 用这个 JWT 连 realtime 成功；
  *   3) 没 token 直接连会被拒绝（用来反证最初的 bug 不是测试环境问题）。
  *
- * 前置：dev:web + dev:realtime 都跑着；本文件会被 `npm run test:e2e` 拾取
- * （在 apps/web 目录下直接执行）。
+ * 还会做一项 **环境对账**：调用 web 的 /api/health 类端点 + realtime 的
+ * /health，让两端各自暴露自己的 SESSION_SECRET fingerprint（避免直接
+ * 泄露原值），不一致就立即报错——这正是「unauthorized: invalid token」
+ * 的根本原因（web 签的 JWT 和 realtime 校验用的不是同一份密钥）。
+ *
+ * 前置：dev:web + dev:realtime 都跑着；在仓库根目录直接执行。
  */
 
 import { io } from 'socket.io-client';
+import { createHash } from 'node:crypto';
 
 const WEB = process.env.WEB_ORIGIN || 'http://localhost:7766';
 const REALTIME = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
 
 const cookieJar = new Map();
+
+function fingerprint(secret) {
+  if (!secret) return '(none)';
+  return createHash('sha256').update(secret).digest('hex').slice(0, 12);
+}
 
 function applySetCookies(headers) {
   const list = typeof headers.getSetCookie === 'function'
@@ -72,6 +82,25 @@ async function browserStyleConnect() {
 }
 
 async function main() {
+  // 0) SESSION_SECRET 对账：让两端各自暴露指纹，不一致直接挂
+  const webHealth = await fetch(WEB + '/api/diag/health').then(r => r.json()).catch(() => null);
+  const rtHealth = await fetch(REALTIME + '/health').then(r => r.json()).catch(() => null);
+  if (!webHealth || !rtHealth) {
+    console.error('✗ 两端没暴露 secret fingerprint 端点，跳过对账（旧版服务不支持）');
+  } else {
+    console.log('[0] secret fingerprint: web=', webHealth.secretFp, ' realtime=', rtHealth.secretFp);
+    if (webHealth.secretFp !== rtHealth.secretFp) {
+      console.error('');
+      console.error('✗ SESSION_SECRET 不一致！这就是「unauthorized: invalid token」的根因。');
+      console.error('  web 用:    ', webHealth.secretFp);
+      console.error('  realtime 用:', rtHealth.secretFp);
+      console.error('  修法：在两个终端里都执行 `set -a && source .env && set +a` 再启动。');
+      console.error('');
+      process.exit(2);
+    }
+    console.log('    ✓ 一致');
+  }
+
   const username = 'e2e_' + Date.now();
 
   // 1) 注册
