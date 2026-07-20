@@ -3,6 +3,7 @@ import {
   applyBonusDice,
   calculateSuccessLevel,
   calculateSanLoss,
+  calculateSanLossFromExpr,
   judge,
   rollForJudgment,
   type Difficulty,
@@ -143,6 +144,88 @@ describe('judgment', () => {
     });
     it('clamps to currentSan', () => {
       expect(calculateSanLoss('fumble', 1, 99, 5)).toBe(5);
+    });
+  });
+
+  /**
+   * calculateSanLossFromExpr：CoC 7e SAN check 路径
+   *   - PL 投 1d100 → 与 sanValue 比对
+   *   - 成功 → 掷 successExpr；失败 → 掷 failureExpr
+   *   - 100 = fumble 自动失败；1 = critical 自动成功（仅 san>=1 时）
+   *
+   * makeRng 帮助函数：返回 (v-1)/10，让 rollD10 输出 v。
+   * 注意：同样的 rng 用于不同面数骰时会得到不同结果：
+   *   - rollD10 = floor(rng * 10) + 1
+   *   - rollD6  = floor(rng *  6) + 1
+   *   - rollD3  = floor(rng *  3) + 1
+   */
+  describe('calculateSanLossFromExpr', () => {
+    it('passes when final <= sanValue and rolls success expr', () => {
+      // final=35 san=50 → pass；成功 1d3 + makeRng([1])=0 → floor(0*3)+1 = 1
+      const r = calculateSanLossFromExpr(35, 50, '1d3', '1d6', makeRng([1]));
+      expect(r.passed).toBe(true);
+      expect(r.loss).toBe(1);
+      expect(r.rolls).toEqual([1]);
+      expect(r.expr).toBe('1d3');
+    });
+
+    it('fails when final > sanValue and rolls failure expr', () => {
+      // final=55 san=50 → fail；失败 1d6 + makeRng([4])=0.3 → floor(0.3*6)+1 = 2
+      const r = calculateSanLossFromExpr(55, 50, '1d3', '1d6', makeRng([4]));
+      expect(r.passed).toBe(false);
+      expect(r.loss).toBe(2);
+      expect(r.rolls).toEqual([2]);
+      expect(r.expr).toBe('1d6');
+    });
+
+    it('final=100 is fumble → always fail', () => {
+      // final=100 san=99 → 自动失败；1d6 + makeRng([5])=0.4 → floor(0.4*6)+1 = 3
+      const r = calculateSanLossFromExpr(100, 99, '1d3', '1d6', makeRng([5]));
+      expect(r.passed).toBe(false);
+      expect(r.loss).toBe(3);
+      expect(r.expr).toBe('1d6');
+    });
+
+    it('final=1 is critical → always pass (when san>=1)', () => {
+      // final=1 san=30 → 自动成功；1d3 + makeRng([2])=0.1 → floor(0.1*3)+1 = 1
+      const r = calculateSanLossFromExpr(1, 30, '1d3', '1d6', makeRng([2]));
+      expect(r.passed).toBe(true);
+      expect(r.loss).toBe(1);
+      expect(r.expr).toBe('1d3');
+    });
+
+    it('clamps loss to sanValue', () => {
+      // sanValue=3 太低，无论骰出几都 clamp 到 3
+      const r = calculateSanLossFromExpr(99, 3, '1d3', '1d6', makeRng([6]));
+      expect(r.passed).toBe(false);
+      expect(r.loss).toBe(3);
+    });
+
+    it('supports composite expr (1d6+2)', () => {
+      // 失败 1d6+2 + makeRng([4])=0.3 → 1d6 投出 2, +2 = 4
+      const r = calculateSanLossFromExpr(80, 50, '0', '1d6+2', makeRng([4]));
+      expect(r.passed).toBe(false);
+      expect(r.loss).toBe(4);
+      expect(r.rolls).toEqual([2, 2]);
+    });
+
+    it('empty expression → loss 0 (no error)', () => {
+      const r = calculateSanLossFromExpr(35, 50, '', '1d6', makeRng([5]));
+      expect(r.passed).toBe(true);
+      expect(r.loss).toBe(0);
+      expect(r.rolls).toEqual([]);
+    });
+
+    it('zero constant expr → loss 0', () => {
+      const r = calculateSanLossFromExpr(80, 50, '0', '0', makeRng([1]));
+      expect(r.passed).toBe(false);
+      expect(r.loss).toBe(0);
+    });
+
+    it('bad expr → loss 0 (no throw)', () => {
+      const r = calculateSanLossFromExpr(35, 50, 'abc', '1d6', makeRng([3]));
+      expect(r.passed).toBe(true);
+      expect(r.loss).toBe(0);
     });
   });
 });

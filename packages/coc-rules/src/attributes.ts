@@ -22,6 +22,31 @@ export interface PrimaryStats {
   luck: number;
 }
 
+/**
+ * 九维基础属性的 key 列表（不含 luck；CoC 7e 中 luck 是单独投掷）。
+ * realtime handler 用它做"按属性判定"的分支。
+ */
+export const PRIMARY_STAT_KEYS = ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu'] as const;
+export type PrimaryStatKey = (typeof PRIMARY_STAT_KEYS)[number];
+
+/** 全大写标签，给前端下拉/标签用 */
+export const PRIMARY_STAT_LABELS: Record<PrimaryStatKey, string> = {
+  str: 'STR',
+  con: 'CON',
+  siz: 'SIZ',
+  dex: 'DEX',
+  app: 'APP',
+  int: 'INT',
+  pow: 'POW',
+  edu: 'EDU',
+};
+
+/** 不分大小写地查 attribute key。命中返回 key，否则 null。 */
+export function resolvePrimaryStatKey(name: string): PrimaryStatKey | null {
+  const lower = name.toLowerCase();
+  return (PRIMARY_STAT_KEYS as readonly string[]).includes(lower) ? (lower as PrimaryStatKey) : null;
+}
+
 export interface DerivedStats {
   hpMax: number;
   mpMax: number;

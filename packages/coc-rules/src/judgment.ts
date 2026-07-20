@@ -13,7 +13,7 @@
  *   - 5e/6e 的规则略有差异。本实现按 CoC 7e 占位，TODO(规则书) 校准。
  */
 
-import { rollD10, type RandomFn } from './dice';
+import { rollD10, rollDie, type RandomFn } from './dice';
 
 export type SuccessLevel = 'critical' | 'extreme' | 'hard' | 'success' | 'fail' | 'fumble';
 
@@ -161,6 +161,9 @@ export function judge(input: JudgmentInput): JudgmentResult {
  *   - fumble                       → max(scMax, sanity * 5)
  *
  * 注：占位实现，TODO(规则书) 校准。
+ *
+ * @deprecated 已被 {@link calculateSanLossFromExpr} 取代；保留做向后兼容，
+ * 后续清理。新代码请用骰子表达式版本。
  */
 export function calculateSanLoss(
   successLevel: SuccessLevel,
@@ -179,4 +182,76 @@ export function calculateSanLoss(
   if (scMax < scMin) return Math.max(0, scMin);
   const loss = Math.floor(random() * (scMax - scMin + 1)) + scMin;
   return Math.max(0, Math.min(loss, currentSan));
+}
+
+/**
+ * SAN check（骰子表达式版本，CoC 7e 标准）。
+ *
+ * PL 先投 1d100，与 `sanValue` 比较决定成败；然后按成败掷 KP 指定的骰子表达式，
+ * 把结果从当前 SAN 里扣掉。
+ *
+ * 规则：
+ *   - 100                          → fumble，自动失败，按 `failureExpr` 扣
+ *   - 1 且 sanValue >= 1           → critical，自动成功，按 `successExpr` 扣
+ *   - 其余：final <= sanValue       → 成功，按 `successExpr` 扣
+ *           final >  sanValue       → 失败，按 `failureExpr` 扣
+ *
+ * 骰子表达式由 KP 在发布判定时填写（例：成功 `1d3` / 失败 `1d6`）；
+ * 也支持纯数字 `0`、`3`、`1d4+2` 等（参见 {@link parseDiceExpression}）。
+ * 表达式解析失败或空表达式 → 损失 0，不报错（让 KP 主动留 0 表示"不扣"）。
+ *
+ * @returns passed  - 是否成功
+ * @returns loss    - 实际扣的 SAN（被 clamp 到 [0, sanValue]）
+ * @returns rolls   - 实际投出的骰子值（按 token 顺序展开，用于日志展示）
+ * @returns expr    - 使用的骰子表达式原文
+ */
+export function calculateSanLossFromExpr(
+  final: number,
+  sanValue: number,
+  successExpr: string,
+  failureExpr: string,
+  random: RandomFn = Math.random,
+): { passed: boolean; loss: number; rolls: number[]; expr: string } {
+  const san = Math.max(0, Math.floor(sanValue));
+  const fumble = final >= 100;
+  // critical 只在 san >= 1 时成立；其余按 1d100 vs SAN 判
+  const passed = !fumble && final <= san && san >= 1;
+
+  const expr = passed ? successExpr : failureExpr;
+  if (!expr || !expr.trim()) return { passed, loss: 0, rolls: [], expr: expr ?? '' };
+
+  // 表达式按 + 拆分，每个 token 独立解析+掷骰；失败返回 0。
+  // 这样能拿到每一次投骰的"个体值"用于日志展示。
+  const tokens = expr.replace(/\s+/g, '').toLowerCase().split('+');
+  const rolls: number[] = [];
+  let sum = 0;
+  for (const t of tokens) {
+    if (t.includes('d')) {
+      const m = t.match(/^(\d+)d(\d+)$/);
+      if (!m) return { passed, loss: 0, rolls, expr };
+      const count = parseInt(m[1], 10);
+      const sides = parseInt(m[2], 10);
+      if (count < 1 || count > 1000 || sides < 1 || sides > 1000) {
+        return { passed, loss: 0, rolls, expr };
+      }
+      for (let i = 0; i < count; i++) {
+        const v = rollDie(sides, random);
+        rolls.push(v);
+        sum += v;
+      }
+    } else if (/^\d+$/.test(t)) {
+      const v = parseInt(t, 10);
+      rolls.push(v);
+      sum += v;
+    } else {
+      return { passed, loss: 0, rolls, expr };
+    }
+  }
+
+  return {
+    passed,
+    loss: Math.max(0, Math.min(sum, san)),
+    rolls,
+    expr,
+  };
 }
