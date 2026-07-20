@@ -15,6 +15,7 @@ import { PresenceBar } from './session/PresenceBar';
 import { JudgmentCreator } from './session/JudgmentCreator';
 import { JudgmentQueue } from './session/JudgmentQueue';
 import { HpChangePanel } from './session/HpChangePanel';
+import { CharacterCardsPanel } from './session/CharacterCardsPanel';
 
 interface Member {
   userId: string;
@@ -377,6 +378,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           <LogPanel logs={logs} members={members} />
         </div>
       </div>
+
+      <CharacterCardsPanel members={members} />
 
       <PresenceBar members={members} />
     </div>
