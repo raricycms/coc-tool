@@ -18,7 +18,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         where: { leftAt: null },
         include: {
           user: { select: { id: true, username: true, avatarUrl: true } },
-          character: { select: { id: true, name: true, hpCurrent: true, hpMax: true, sanCurrent: true, sanMax: true, mpCurrent: true, mpMax: true, luckCurrent: true, skills: true, damageBonus: true } },
+          character: { select: { id: true, name: true, str: true, con: true, siz: true, dex: true, app: true, int: true, pow: true, edu: true, hpCurrent: true, hpMax: true, sanCurrent: true, sanMax: true, mpCurrent: true, mpMax: true, luckCurrent: true, skills: true, damageBonus: true } },
         },
       },
     },
@@ -67,6 +67,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           character: m.character ? {
             id: m.character.id,
             name: m.character.name,
+            str: m.character.str,
+            con: m.character.con,
+            siz: m.character.siz,
+            dex: m.character.dex,
+            app: m.character.app,
+            int: m.character.int,
+            pow: m.character.pow,
+            edu: m.character.edu,
             hp: m.character.hpCurrent,
             hpMax: m.character.hpMax,
             san: m.character.sanCurrent,

@@ -33,7 +33,9 @@ export function JudgmentQueue({ judgments, role, currentUserId, members, onRoll,
                 <div><b>{j.characterName}</b> - {j.skillName}</div>
                 <div className="text-ink-100/40">
                   {j.difficulty} · {j.bonusDice > 0 ? `+${j.bonusDice}` : j.bonusDice} 奖励骰
-                  {j.scMin != null && j.scMax != null && ` · sc ${j.scMin}/${j.scMax}`}
+                  {j.scSuccessExpr != null && j.scFailureExpr != null && (
+                    <> · 成功扣 <code className="font-mono">{j.scSuccessExpr}</code> / 失败扣 <code className="font-mono">{j.scFailureExpr}</code></>
+                  )}
                 </div>
                 {j.note && <div className="text-ink-100/60 mt-1 italic">{j.note}</div>}
                 <div className="mt-2 flex gap-1">
