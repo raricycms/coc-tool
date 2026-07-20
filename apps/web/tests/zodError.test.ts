@@ -59,7 +59,7 @@ describe('formatZodIssue', () => {
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [
-        { name: '侦查', value: 25 },
+        { name: '侦察', value: 25 },
         { name: '聆听', value: 200 },
       ],
     });
@@ -76,7 +76,7 @@ describe('formatZodIssue', () => {
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [
-        { name: '侦查', value: 25 },
+        { name: '侦察', value: 25 },
         { name: '聆听', value: 200 },
       ],
     };
@@ -182,7 +182,7 @@ describe('buildFieldErrors', () => {
         app: 50, int: 50, pow: 50, edu: 50, luck: 50,
       },
       skills: [
-        { name: '侦查', value: 25 },
+        { name: '侦察', value: 25 },
         { name: '聆听', value: 999 },
       ],
     };

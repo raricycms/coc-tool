@@ -28,7 +28,7 @@ describe('judgment business logic', () => {
         str: 60, con: 70, siz: 50, dex: 60, app: 50, int: 65, pow: 50, edu: 70, luck: 50,
         hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
         hpCurrent: 12, mpCurrent: 10, sanCurrent: 50, luckCurrent: 50,
-        skills: { create: [{ name: '侦查', value: 50 }] },
+        skills: { create: [{ name: '侦察', value: 50 }] },
       },
     });
     const session = await prisma.session.create({
@@ -39,18 +39,18 @@ describe('judgment business logic', () => {
     });
 
     // 1) KP 创建 SAN 判定
-    const skill = await prisma.skill.findFirst({ where: { characterId: char.id, name: '侦查' } });
+    const skill = await prisma.skill.findFirst({ where: { characterId: char.id, name: '侦察' } });
     const j = await prisma.judgment.create({
       data: {
         sessionId: session.id,
         characterId: char.id,
-        skillName: '侦查',
+        skillName: '侦察',
         difficulty: 'hard',
         bonusDice: 0,
         scMin: null,
         scMax: null,
         status: 'PENDING',
-        targetSnapshot: JSON.stringify({ skillName: '侦查', value: skill!.value, hp: char.hpCurrent, san: char.sanCurrent }),
+        targetSnapshot: JSON.stringify({ skillName: '侦察', value: skill!.value, hp: char.hpCurrent, san: char.sanCurrent }),
       },
     });
     expect(j.status).toBe('PENDING');
@@ -82,7 +82,7 @@ describe('judgment business logic', () => {
         sessionId: session.id, type: 'JUDGMENT', judgmentId: j.id,
         characterId: char.id,
         payload: JSON.stringify({
-          skillName: '侦查', difficulty: 'hard', bonusDice: 0,
+          skillName: '侦察', difficulty: 'hard', bonusDice: 0,
           rawRolls: result.rawRolls, final: result.final,
           successLevel: result.successLevel,
         }),

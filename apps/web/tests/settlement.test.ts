@@ -44,7 +44,7 @@ async function makeSession(kpId: string, plId: string): Promise<{ sessionId: str
       ...VALID_PRIMARY,
       hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
       hpCurrent: 12, mpCurrent: 10, sanCurrent: 100, luckCurrent: 50,
-      skills: { create: [{ name: '侦查', value: 50 }, { name: 'Cthulhu Mythos', value: 5, isMythos: true }] },
+      skills: { create: [{ name: '侦察', value: 50 }, { name: '克苏鲁知识', value: 5, isMythos: true }] },
     },
   });
   await prisma.sessionMember.create({
@@ -102,7 +102,7 @@ describe('settlement flow', () => {
       where: { id: charId },
       include: { skills: true },
     });
-    const mythos = char?.skills.find((s) => s.name === 'Cthulhu Mythos');
+    const mythos = char?.skills.find((s) => s.name === '克苏鲁知识');
     expect(mythos?.value).toBe(8);
     expect(char?.sanCurrent).toBe(102);
 
@@ -121,7 +121,7 @@ describe('settlement flow', () => {
     await loginAs(pl.id, pl.username);
     const skill = await callRoute(settleSkillRoute.POST, {
       url: `http://localhost/api/sessions/${sessionId}/settlement/skill-growth`, method: 'POST',
-      body: { growths: [{ characterId: charId, skillName: '侦查' }] },
+      body: { growths: [{ characterId: charId, skillName: '侦察' }] },
     });
     expect(skill.status).toBe(200);
     expect(Array.isArray(skill.data.data.results)).toBe(true);
@@ -130,7 +130,7 @@ describe('settlement flow', () => {
       where: { id: charId },
       include: { skills: true },
     });
-    const detect = char?.skills.find((s) => s.name === '侦查');
+    const detect = char?.skills.find((s) => s.name === '侦察');
     expect(detect?.value).toBeGreaterThanOrEqual(50);
 
     // 6) 完结（KP）

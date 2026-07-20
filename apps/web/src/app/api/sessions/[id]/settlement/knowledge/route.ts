@@ -25,8 +25,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         });
         if (!c) continue;
 
-        // 更新 Cthulhu Mythos
-        const mythos = c.skills.find((s) => s.name === 'Cthulhu Mythos');
+        // 更新克苏鲁知识（DEFAULT_SKILLS 中的中文键名）
+        const mythos = c.skills.find((s) => s.name === '克苏鲁知识');
         if (mythos) {
           await tx.skill.update({
             where: { id: mythos.id },
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           await tx.skill.create({
             data: {
               characterId: c.id,
-              name: 'Cthulhu Mythos',
+              name: '克苏鲁知识',
               value: g.amount,
               isMythos: true,
             },
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             type: 'SKILL_CHANGE',
             characterId: c.id,
             payload: JSON.stringify({
-              skillName: 'Cthulhu Mythos',
+              skillName: '克苏鲁知识',
               delta: g.amount,
               reason: '结算：神话知识增长',
             }),

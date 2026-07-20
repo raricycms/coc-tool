@@ -73,6 +73,13 @@ export function CharacterForm() {
     );
   }, [primary.edu]);
 
+  // 闪避 = DEX / 2（向上取整）。当 DEX 变化时同步更新闪避技能值。
+  useEffect(() => {
+    setSkills((prev) =>
+      prev.map((s) => (s.name === '闪避' ? { ...s, value: Math.ceil(primary.dex / 2) } : s)),
+    );
+  }, [primary.dex]);
+
   const submit = async () => {
     setError(null);
     clearAll();

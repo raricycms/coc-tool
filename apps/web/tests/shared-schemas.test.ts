@@ -114,7 +114,7 @@ describe('character schemas', () => {
       age: 30,
       era: '1920s',
       primary: VALID_PRIMARY,
-      skills: [{ name: '侦查', value: 60 }],
+      skills: [{ name: '侦察', value: 60 }],
     });
     expect(r.success).toBe(true);
   });
@@ -216,7 +216,7 @@ describe('judgment schema', () => {
     const r = JudgmentCreateSchema.parse({
       targetCharacterId: 'c1',
       type: 'skill',
-      skillName: '侦查',
+      skillName: '侦察',
     });
     expect(r.bonusDice).toBe(0);
     expect(r.difficulty).toBe('regular');
@@ -254,7 +254,7 @@ describe('settlement schemas', () => {
   });
 
   it('SkillGrowthRequestSchema: skillName 必填且 <= 40', () => {
-    expect(SkillGrowthRequestSchema.safeParse({ growths: [{ characterId: 'c', skillName: '侦查' }] }).success).toBe(true);
+    expect(SkillGrowthRequestSchema.safeParse({ growths: [{ characterId: 'c', skillName: '侦察' }] }).success).toBe(true);
     expect(SkillGrowthRequestSchema.safeParse({ growths: [{ characterId: 'c', skillName: '' }] }).success).toBe(false);
     expect(SkillGrowthRequestSchema.safeParse({ growths: [{ characterId: 'c', skillName: 'x'.repeat(41) }] }).success).toBe(false);
   });

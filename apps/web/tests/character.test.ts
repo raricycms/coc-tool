@@ -62,7 +62,7 @@ describe('character CRUD', () => {
         ...VALID_PRIMARY,
         hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
         hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
-        skills: { create: [{ name: '侦查', value: 60 }, { name: '聆听', value: 55 }] },
+        skills: { create: [{ name: '侦察', value: 60 }, { name: '聆听', value: 55 }] },
       },
       include: { skills: true },
     });
@@ -73,7 +73,7 @@ describe('character CRUD', () => {
       include: { skills: true },
     });
     expect(found?.name).toBe('林远');
-    expect(found?.skills.find((s) => s.name === '侦查')?.value).toBe(60);
+    expect(found?.skills.find((s) => s.name === '侦察')?.value).toBe(60);
 
     // 软删
     await prisma.character.update({

@@ -42,7 +42,7 @@ async function makeChar(ownerId: string, name = '林远'): Promise<string> {
       ...VALID_PRIMARY,
       hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
       hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
-      skills: { create: [{ name: '侦查', value: 60 }] },
+      skills: { create: [{ name: '侦察', value: 60 }] },
     },
   });
   return c.id;
@@ -65,7 +65,7 @@ describe('characters API', () => {
         era: '1920s',
         primary: VALID_PRIMARY,
         skills: [
-          { name: '侦查', value: 60 },
+          { name: '侦察', value: 60 },
           { name: '聆听', value: 55 },
         ],
         weapons: [{ name: '撬棍', skill: '格斗', damage: '1d6' }],
@@ -176,7 +176,7 @@ describe('characters API', () => {
     });
     expect(res3.status).toBe(200);
     expect(res3.data.data.skills).toHaveLength(2);
-    expect(res3.data.data.skills.find((s: any) => s.name === '侦查')).toBeUndefined();
+    expect(res3.data.data.skills.find((s: any) => s.name === '侦察')).toBeUndefined();
   });
 
   it('DELETE 软删：status=RETIRED, retiredReason=user_request', async () => {

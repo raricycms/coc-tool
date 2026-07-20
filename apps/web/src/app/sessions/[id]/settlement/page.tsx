@@ -44,8 +44,8 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
       mpCurrent: m.character!.mpCurrent,
       mpMax: m.character!.mpMax,
       luck: m.character!.luckCurrent,
-      mythos: m.character!.skills.find((sk) => sk.name === 'Cthulhu Mythos')?.value ?? 0,
-      skills: m.character!.skills.filter((sk) => sk.name !== 'Cthulhu Mythos'),
+      mythos: m.character!.skills.find((sk) => sk.name === '克苏鲁知识')?.value ?? 0,
+      skills: m.character!.skills.filter((sk) => sk.name !== '克苏鲁知识'),
       retired: m.character!.status === 'RETIRED',
     }));
 
