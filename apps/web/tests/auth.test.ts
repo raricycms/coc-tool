@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '@coc-tools/db';
 import { createCaptcha } from '@/lib/captcha';
-import { callRoute, resetCookies, getCookie } from './helpers';
+import { callRoute, resetCookies, getCookie, getCookieOptions } from './helpers';
 
 import * as registerRoute from '@/app/api/auth/register/route';
 import * as loginRoute from '@/app/api/auth/login/route';
@@ -143,5 +143,60 @@ describe('auth integration', () => {
     });
     expect(res.status).toBe(409);
     expect(res.data.error.code).toBe('user_exists');
+  });
+
+  it('remember=true 时 session cookie maxAge = 365 天；否则 7 天', async () => {
+    const SEVEN_DAYS = 7 * 24 * 3600;
+    const ONE_YEAR = 365 * 24 * 3600;
+
+    // a) 默认（不传 remember）= 短期
+    const c1 = createCaptcha();
+    const r1 = await callRoute(registerRoute.POST, {
+      url: 'http://localhost/api/auth/register', method: 'POST',
+      body: { username: 'short', password: 'longpassword123', captchaToken: c1.token, captchaAnswer: c1.answer },
+    });
+    expect(r1.status).toBe(200);
+    expect(getCookieOptions('session')?.maxAge).toBe(SEVEN_DAYS);
+
+    // b) remember=true = 长期
+    resetCookies();
+    const c2 = createCaptcha();
+    const r2 = await callRoute(registerRoute.POST, {
+      url: 'http://localhost/api/auth/register', method: 'POST',
+      body: {
+        username: 'longterm', password: 'longpassword123',
+        captchaToken: c2.token, captchaAnswer: c2.answer,
+        remember: true,
+      },
+    });
+    expect(r2.status).toBe(200);
+    expect(getCookieOptions('session')?.maxAge).toBe(ONE_YEAR);
+
+    // c) 登录时传 remember 也走长期
+    resetCookies();
+    const c3 = createCaptcha();
+    const r3 = await callRoute(loginRoute.POST, {
+      url: 'http://localhost/api/auth/login', method: 'POST',
+      body: {
+        username: 'longterm', password: 'longpassword123',
+        captchaToken: c3.token, captchaAnswer: c3.answer,
+        remember: true,
+      },
+    });
+    expect(r3.status).toBe(200);
+    expect(getCookieOptions('session')?.maxAge).toBe(ONE_YEAR);
+
+    // d) 登录不传 remember = 短期
+    resetCookies();
+    const c4 = createCaptcha();
+    const r4 = await callRoute(loginRoute.POST, {
+      url: 'http://localhost/api/auth/login', method: 'POST',
+      body: {
+        username: 'longterm', password: 'longpassword123',
+        captchaToken: c4.token, captchaAnswer: c4.answer,
+      },
+    });
+    expect(r4.status).toBe(200);
+    expect(getCookieOptions('session')?.maxAge).toBe(SEVEN_DAYS);
   });
 });

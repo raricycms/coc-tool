@@ -13,6 +13,7 @@ export default function LoginPage() {
   const { get, apply, clear, clearAll } = useFieldErrors();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true); // 默认勾选：长期保持登录
   const [captcha, setCaptcha] = useState({ token: '', answer: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,7 @@ export default function LoginPage() {
       password,
       captchaToken: captcha.token,
       captchaAnswer: captcha.answer,
+      remember,
     } satisfies LoginInput;
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -79,6 +81,10 @@ export default function LoginPage() {
             <label className="label">验证码</label>
             <CaptchaBox onChange={setCaptcha} />
           </div>
+          <label className="flex items-center gap-2 text-sm text-ink-100/70">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            记住我（保持登录 365 天；不勾则 7 天）
+          </label>
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? '登录中...' : '登录'}

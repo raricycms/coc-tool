@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true); // 默认勾选：长期保持登录
   const [captcha, setCaptcha] = useState({ token: '', answer: '' });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,7 @@ export default function RegisterPage() {
       password,
       captchaToken: captcha.token,
       captchaAnswer: captcha.answer,
+      remember,
     } satisfies RegisterInput;
     const res = await fetch('/api/auth/register', {
       method: 'POST',
@@ -89,6 +91,10 @@ export default function RegisterPage() {
             <label className="label">验证码</label>
             <CaptchaBox onChange={setCaptcha} />
           </div>
+          <label className="flex items-center gap-2 text-sm text-ink-100/70">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            记住我（保持登录 365 天；不勾则 7 天）
+          </label>
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? '注册中...' : '注册'}

@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await issueSession(user.id, user.username);
+    await issueSession(user.id, user.username, 'user', body.remember);
 
     return ok({ userId: user.id, username: user.username });
   } catch (e) {

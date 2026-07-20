@@ -6,6 +6,7 @@ export const RegisterSchema = z.object({
   password: z.string().min(10).max(100),
   captchaToken: z.string().min(1),
   captchaAnswer: z.string().min(1).max(20),
+  remember: z.boolean().optional().default(false),
 });
 
 export const LoginSchema = z.object({
@@ -13,6 +14,7 @@ export const LoginSchema = z.object({
   password: z.string().min(1).max(100),
   captchaToken: z.string().min(1),
   captchaAnswer: z.string().min(1).max(20),
+  remember: z.boolean().optional().default(false),
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;

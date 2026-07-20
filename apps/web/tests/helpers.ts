@@ -14,6 +14,7 @@ let _asUsername: string | null = null;
 
 // Mock next/headers
 import { vi } from 'vitest';
+let _cookieOpts = new Map<string, any>();
 vi.mock('next/headers', () => ({
   cookies: () => ({
     get: (name: string) => {
@@ -22,15 +23,18 @@ vi.mock('next/headers', () => ({
     },
     set: (name: string, value: string, opts: any) => {
       _nextCookies.set(name, value);
+      _cookieOpts.set(name, opts);
     },
     delete: (name: string) => {
       _nextCookies.delete(name);
+      _cookieOpts.delete(name);
     },
   }),
 }));
 
 export function resetCookies() {
   _nextCookies = new Map();
+  _cookieOpts = new Map();
   _asUserId = null;
   _asUsername = null;
 }
@@ -41,6 +45,11 @@ export function setCookie(name: string, value: string) {
 
 export function getCookie(name: string): string | undefined {
   return _nextCookies.get(name);
+}
+
+/** 取 cookie 写入时的 options（含 maxAge） */
+export function getCookieOptions(name: string): any | undefined {
+  return _cookieOpts.get(name);
 }
 
 /** 模拟当前用户身份（仅对 requireUser() 起作用） */

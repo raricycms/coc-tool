@@ -40,7 +40,10 @@ const PLACEHOLDER_SECRET = 'dev-secret-please-replace-this-32-bytes';
 
 const SECRET = () => new TextEncoder().encode(process.env.SESSION_SECRET!);
 const COOKIE_NAME = 'session';
-const COOKIE_MAX_AGE = 7 * 24 * 3600;
+/** 默认 session 有效期：7 天（浏览器关闭即失效）。 */
+const COOKIE_MAX_AGE_DEFAULT = 7 * 24 * 3600;
+/** 「记住我」session 有效期：365 天（持久 cookie，跨重启保留）。 */
+const COOKIE_MAX_AGE_REMEMBER = 365 * 24 * 3600;
 
 /**
  * 只有站点确实以 HTTPS 对外提供服务时，才给 Cookie 加 Secure 标记。
@@ -59,11 +62,13 @@ export interface SessionPayload {
   role: string;
 }
 
-export async function issueSession(userId: string, username: string, role: string = 'user') {
+export async function issueSession(userId: string, username: string, role: string = 'user', remember: boolean = false) {
+  const maxAge = remember ? COOKIE_MAX_AGE_REMEMBER : COOKIE_MAX_AGE_DEFAULT;
+  const expSeconds = remember ? '365d' : '7d';
   const jwt = await new SignJWT({ userId, username, role })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(expSeconds)
     .sign(SECRET());
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, jwt, {
@@ -71,7 +76,7 @@ export async function issueSession(userId: string, username: string, role: strin
     secure: cookieSecure(),
     sameSite: 'lax',
     path: '/',
-    maxAge: COOKIE_MAX_AGE,
+    maxAge,
   });
 }
 
