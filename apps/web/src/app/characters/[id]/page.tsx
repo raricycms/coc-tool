@@ -24,7 +24,12 @@ export default async function CharacterDetailPage({ params }: { params: Promise<
           <h1 className="text-2xl font-bold">{c.name} {c.status === 'RETIRED' && <span className="text-sm text-red-400 ml-2">⚰ 已撕卡</span>}</h1>
           <p className="text-sm text-ink-100/50">{c.occupation ?? '无职业'} · {c.era} · {c.age ? `${c.age}岁` : ''}</p>
         </div>
-        <Link href="/characters" className="btn-ghost text-sm">← 返回</Link>
+        <div className="flex gap-2">
+          {c.status === 'ACTIVE' && (
+            <Link href={`/characters/${c.id}/edit`} className="btn-primary text-sm">✎ 编辑</Link>
+          )}
+          <Link href="/characters" className="btn-ghost text-sm">← 返回</Link>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -11,6 +11,27 @@ type PrimaryStats = {
   app: number; int: number; pow: number; edu: number; luck: number;
 };
 
+type Weapon = { name: string; skill: string; damage: string; range?: string };
+type Equipment = { name: string; quantity: number; note?: string };
+
+export type CharacterFormInitial = {
+  id?: string;
+  name?: string;
+  gender?: 'male' | 'female' | 'other' | '';
+  age?: number;
+  birthplace?: string;
+  residence?: string;
+  nationality?: string;
+  occupation?: string;
+  era?: 'modern' | '1920s' | 'victorian' | 'ancient' | 'future';
+  primary?: PrimaryStats;
+  skills?: Array<{ name: string; value: number; isMythos?: boolean }>;
+  weapons?: Weapon[];
+  equipment?: Equipment[];
+  background?: string;
+  notes?: string;
+};
+
 const DEFAULT_PRIMARY: PrimaryStats = {
   str: 50, con: 50, siz: 50, dex: 50,
   app: 50, int: 50, pow: 50, edu: 50, luck: 50,
@@ -32,29 +53,30 @@ function rollPrimary(): PrimaryStats {
   };
 }
 
-export function CharacterForm() {
+export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = {}) {
+  const editingId = initial?.id;
   const router = useRouter();
   const { get, apply, clear, clearAll } = useFieldErrors();
   const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
-  const [age, setAge] = useState(30);
-  const [birthplace, setBirthplace] = useState('');
-  const [residence, setResidence] = useState('');
-  const [nationality, setNationality] = useState('中国');
-  const [occupation, setOccupation] = useState('');
-  const [era, setEra] = useState<'modern' | '1920s' | 'victorian' | 'ancient' | 'future'>('modern');
-  const [primary, setPrimary] = useState<PrimaryStats>(DEFAULT_PRIMARY);
+  const [name, setName] = useState(initial?.name ?? '');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>(initial?.gender ?? '');
+  const [age, setAge] = useState(initial?.age ?? 30);
+  const [birthplace, setBirthplace] = useState(initial?.birthplace ?? '');
+  const [residence, setResidence] = useState(initial?.residence ?? '');
+  const [nationality, setNationality] = useState(initial?.nationality ?? '中国');
+  const [occupation, setOccupation] = useState(initial?.occupation ?? '');
+  const [era, setEra] = useState<'modern' | '1920s' | 'victorian' | 'ancient' | 'future'>(initial?.era ?? 'modern');
+  const [primary, setPrimary] = useState<PrimaryStats>(initial?.primary ?? DEFAULT_PRIMARY);
   const [skills, setSkills] = useState<Array<{ name: string; value: number; isMythos?: boolean }>>(
-    Object.entries(DEFAULT_SKILLS).map(([name, value]) => ({ name, value })),
+    initial?.skills ?? Object.entries(DEFAULT_SKILLS).map(([name, value]) => ({ name, value })),
   );
   const [newSkill, setNewSkill] = useState({ name: '', value: 50 });
-  const [weapons, setWeapons] = useState<Array<{ name: string; skill: string; damage: string; range?: string }>>([]);
+  const [weapons, setWeapons] = useState<Weapon[]>(initial?.weapons ?? []);
   const [newWeapon, setNewWeapon] = useState({ name: '', skill: '', damage: '', range: '' });
-  const [equipment, setEquipment] = useState<Array<{ name: string; quantity: number }>>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>(initial?.equipment ?? []);
   const [newEquip, setNewEquip] = useState({ name: '', quantity: 1 });
-  const [background, setBackground] = useState('');
-  const [notes, setNotes] = useState('');
+  const [background, setBackground] = useState(initial?.background ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -89,22 +111,22 @@ export function CharacterForm() {
       nationality, occupation, era, primary, skills, weapons, equipment,
       background, notes,
     };
-    const res = await fetch('/api/characters', {
-      method: 'POST',
+    const url = editingId ? `/api/characters/${editingId}` : '/api/characters';
+    const method = editingId ? 'PATCH' : 'POST';
+    const res = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     setLoading(false);
     const j = await res.json();
     if (!j.ok) {
-      // 字段级错误 → 标红；非字段错误（captcha、429 等）→ 顶部错误条
       if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
         apply(j.error.fields);
-        // 跳到第一个出错的 step
         const firstStep = stepForPath(j.error.fields[0].path);
         if (firstStep) setStep(firstStep);
       } else {
-        setError(j.error?.message || '创建失败');
+        setError(j.error?.message || (editingId ? '保存失败' : '创建失败'));
       }
       return;
     }
@@ -353,7 +375,7 @@ export function CharacterForm() {
           <button type="button" className="btn-primary" onClick={() => setStep(step + 1)} disabled={step === 1 && !name}>下一步 →</button>
         ) : (
           <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
-            {loading ? '创建中...' : '✓ 创建车卡'}
+            {loading ? (editingId ? '保存中...' : '创建中...') : (editingId ? '✓ 保存车卡' : '✓ 创建车卡')}
           </button>
         )}
       </div>
