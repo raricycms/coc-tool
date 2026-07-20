@@ -332,7 +332,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         </div>
       )}
 
-      <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_1fr_22rem]">
+      <div className="mx-auto grid w-full max-w-7xl min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[1fr_1fr_22rem]">
         <div className="flex min-h-[20rem] flex-col lg:min-h-0">
           <ICPanel
             messages={icMessages}
@@ -352,7 +352,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           />
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex min-h-[20rem] flex-col gap-3 overflow-hidden lg:min-h-0">
           <ClockPanel clock={clock} role={role} onControl={controlClock} />
           {role === 'KP' && (
             <HpChangePanel
