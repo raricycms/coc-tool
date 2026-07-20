@@ -11,6 +11,10 @@ import {
   JudgmentRollSchema,
   HpDiceRollSchema,
   DiceRollCreateSchema,
+  WeaponUpsertSchema,
+  WeaponDeleteSchema,
+  EquipmentUpsertSchema,
+  EquipmentDeleteSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
   SOCKET_EVENTS,
@@ -432,6 +436,10 @@ export async function registerHandlers(io: Server) {
         };
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.JUDGMENT_RESULT, resultEvt);
         io.to(`session:${payload.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(logEntry));
+        // SAN 扣完后同步刷新角色快照给所有人
+        if (scLoss && scLoss > 0) {
+          await broadcastCharacter(io, payload.sessionId, judgment.characterId);
+        }
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -514,6 +522,8 @@ export async function registerHandlers(io: Server) {
         });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.HP_CHANGED, { characterId, hpAfter });
         io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
+        // 同步刷新弹窗里的 HP/SAN/MP 等
+        await broadcastCharacter(io, sessionId, characterId);
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -566,6 +576,8 @@ export async function registerHandlers(io: Server) {
           reason: data.reason,
         });
         io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
+        // 同步刷新弹窗里 HP/SAN/MP 等
+        await broadcastCharacter(io, raw.sessionId, char.id);
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -598,6 +610,102 @@ export async function registerHandlers(io: Server) {
           },
         });
         io.to(`session:${raw.sessionId}`).emit(SOCKET_EVENTS.LOG_ENTRY, toLogEntry(entry));
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    // ── 武器 upsert / delete (KP only) ──
+    // KP 即时编辑 PL 的武器库：增 / 改 / 删；成功后广播 CHARACTER_UPDATED 给全员，
+    // 附带刷新后的完整角色数据，让所有人（KP + 所有 PL）能立刻在车卡弹窗里看到新数据。
+    s.on(SOCKET_EVENTS.WEAPON_UPSERT, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以编辑武器');
+        const data = WeaponUpsertSchema.parse(raw);
+
+        if (data.id) {
+          await prisma.weapon.update({
+            where: { id: data.id },
+            data: {
+              name: data.name,
+              skill: data.skill,
+              damage: data.damage,
+              range: data.range ?? null,
+              ammo: data.ammo ?? null,
+              note: data.note ?? null,
+            },
+          });
+        } else {
+          await prisma.weapon.create({
+            data: {
+              characterId: data.characterId,
+              name: data.name,
+              skill: data.skill,
+              damage: data.damage,
+              range: data.range ?? null,
+              ammo: data.ammo ?? null,
+              note: data.note ?? null,
+            },
+          });
+        }
+        await broadcastCharacter(io, raw.sessionId, data.characterId);
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    s.on(SOCKET_EVENTS.WEAPON_DELETE, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以删除武器');
+        const data = WeaponDeleteSchema.parse(raw);
+        await prisma.weapon.delete({ where: { id: data.id } });
+        await broadcastCharacter(io, raw.sessionId, data.characterId);
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    // ── 物品 upsert / delete (KP only) ──
+    s.on(SOCKET_EVENTS.EQUIPMENT_UPSERT, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以编辑物品');
+        const data = EquipmentUpsertSchema.parse(raw);
+
+        if (data.id) {
+          await prisma.equipment.update({
+            where: { id: data.id },
+            data: {
+              name: data.name,
+              quantity: data.quantity ?? 1,
+              note: data.note ?? null,
+            },
+          });
+        } else {
+          await prisma.equipment.create({
+            data: {
+              characterId: data.characterId,
+              name: data.name,
+              quantity: data.quantity ?? 1,
+              note: data.note ?? null,
+            },
+          });
+        }
+        await broadcastCharacter(io, raw.sessionId, data.characterId);
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    s.on(SOCKET_EVENTS.EQUIPMENT_DELETE, async (raw: { sessionId: string } & any) => {
+      try {
+        const member = await ensureMember(raw.sessionId, user.userId);
+        if (member.role !== 'KP') throw new Error('只有 KP 可以删除物品');
+        const data = EquipmentDeleteSchema.parse(raw);
+        await prisma.equipment.delete({ where: { id: data.id } });
+        await broadcastCharacter(io, raw.sessionId, data.characterId);
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -675,4 +783,38 @@ function toLogEntry(entry: any): LogEntryPayload {
 function safeParseJson(s: any): Record<string, unknown> {
   if (typeof s !== 'string') return s as any;
   try { return JSON.parse(s); } catch { return {}; }
+}
+
+/**
+ * 推送某个角色的最新快照到整个 session 房间；前端拿到 CHARACTER_UPDATED 后
+ * 用 payload.character 直接覆盖本地缓存的 member.character，避免重复 fetch。
+ */
+async function broadcastCharacter(io: Server, sessionId: string, characterId: string) {
+  const c = await prisma.character.findUnique({
+    where: { id: characterId },
+    include: { skills: true, weapons: true, equipment: true },
+  });
+  if (!c) return;
+  io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.CHARACTER_UPDATED, {
+    characterId,
+    character: {
+      id: c.id,
+      name: c.name,
+      str: c.str, con: c.con, siz: c.siz, dex: c.dex,
+      app: c.app, int: c.int, pow: c.pow, edu: c.edu,
+      hp: c.hpCurrent, hpMax: c.hpMax,
+      san: c.sanCurrent, sanMax: c.sanMax,
+      mp: c.mpCurrent, mpMax: c.mpMax,
+      luck: c.luckCurrent,
+      damageBonus: c.damageBonus,
+      skills: c.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
+      weapons: c.weapons.map((w) => ({
+        id: w.id, name: w.name, skill: w.skill, damage: w.damage,
+        range: w.range, ammo: w.ammo, note: w.note,
+      })),
+      equipment: c.equipment.map((e) => ({
+        id: e.id, name: e.name, quantity: e.quantity, note: e.note,
+      })),
+    },
+  });
 }

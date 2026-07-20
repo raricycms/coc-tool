@@ -11,6 +11,10 @@ import type {
   JudgmentRollSchema,
   HpDiceRollSchema,
   DiceRollCreateSchema,
+  WeaponUpsertSchema,
+  WeaponDeleteSchema,
+  EquipmentUpsertSchema,
+  EquipmentDeleteSchema,
   ClockControlSchema,
   LogHistoryRequestSchema,
 } from './schemas';
@@ -26,6 +30,10 @@ export const SOCKET_EVENTS = {
   HP_CHANGE: 'hp:change',
   HP_DICE_ROLL: 'hp:dice:roll',
   DICE_ROLL: 'dice:roll',
+  WEAPON_UPSERT: 'weapon:upsert',
+  WEAPON_DELETE: 'weapon:delete',
+  EQUIPMENT_UPSERT: 'equipment:upsert',
+  EQUIPMENT_DELETE: 'equipment:delete',
   JOIN_SESSION: 'session:join',
   LEAVE_SESSION: 'session:leave',
   LOG_HISTORY: 'log:history',
@@ -42,6 +50,7 @@ export const SOCKET_EVENTS = {
   PRESENCE_UPDATE: 'presence:update',
   LOG_ENTRY: 'log:entry',
   LOG_HISTORY_RES: 'log:history:res',
+  CHARACTER_UPDATED: 'character:updated',
   ERROR: 'error',
 } as const;
 
@@ -56,6 +65,10 @@ export type ClockControlPayload = z.infer<typeof ClockControlSchema>;
 export type LogHistoryRequestPayload = z.infer<typeof LogHistoryRequestSchema>;
 export type HpDiceRollPayload = z.infer<typeof HpDiceRollSchema>;
 export type DiceRollCreatePayload = z.infer<typeof DiceRollCreateSchema>;
+export type WeaponUpsertPayload = z.infer<typeof WeaponUpsertSchema>;
+export type WeaponDeletePayload = z.infer<typeof WeaponDeleteSchema>;
+export type EquipmentUpsertPayload = z.infer<typeof EquipmentUpsertSchema>;
+export type EquipmentDeletePayload = z.infer<typeof EquipmentDeleteSchema>;
 
 // ── 推送给客户端的消息 ──
 

@@ -10,7 +10,14 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '@coc-tools/db';
-import { DiceRollCreateSchema, HpDiceRollSchema } from '@coc-tools/shared';
+import {
+  DiceRollCreateSchema,
+  HpDiceRollSchema,
+  WeaponUpsertSchema,
+  WeaponDeleteSchema,
+  EquipmentUpsertSchema,
+  EquipmentDeleteSchema,
+} from '@coc-tools/shared';
 import { rollExpressionDetailed } from '@coc-tools/coc-rules';
 
 describe('KP 公开掷骰', () => {
@@ -106,5 +113,100 @@ describe('KP 公开掷骰', () => {
     expect(hp.characterId).toBe('abc');
     const pub = DiceRollCreateSchema.parse({ title: '天气', diceExpr: '1d6' });
     expect(pub.title).toBe('天气');
+  });
+
+  it('WeaponUpsertSchema: 新增（无 id）', () => {
+    const r = WeaponUpsertSchema.parse({
+      characterId: 'char_1',
+      name: '小刀',
+      skill: '斗殴',
+      damage: '1d4',
+      range: '近战',
+      ammo: 0,
+    });
+    expect(r.id).toBeUndefined();
+    expect(r.name).toBe('小刀');
+  });
+
+  it('WeaponUpsertSchema: 编辑（带 id）', () => {
+    const r = WeaponUpsertSchema.parse({
+      characterId: 'char_1', id: 'w_existing',
+      name: '小刀+1', skill: '斗殴', damage: '1d4+1',
+    });
+    expect(r.id).toBe('w_existing');
+    expect(r.damage).toBe('1d4+1');
+  });
+
+  it('WeaponUpsertSchema: 拒绝空 name / skill / damage', () => {
+    expect(() => WeaponUpsertSchema.parse({ characterId: 'c', name: '', skill: 'x', damage: '1d4' })).toThrow();
+    expect(() => WeaponUpsertSchema.parse({ characterId: 'c', name: 'x', skill: '', damage: '1d4' })).toThrow();
+    expect(() => WeaponUpsertSchema.parse({ characterId: 'c', name: 'x', skill: 'y', damage: '' })).toThrow();
+  });
+
+  it('WeaponDeleteSchema', () => {
+    const r = WeaponDeleteSchema.parse({ characterId: 'char_1', id: 'w_existing' });
+    expect(r.id).toBe('w_existing');
+  });
+
+  it('EquipmentUpsertSchema: 新增（默认 quantity=1）', () => {
+    const r = EquipmentUpsertSchema.parse({ characterId: 'char_1', name: '手电筒' });
+    expect(r.quantity).toBe(1);
+  });
+
+  it('EquipmentUpsertSchema: 编辑（带 id + quantity）', () => {
+    const r = EquipmentUpsertSchema.parse({ characterId: 'c', id: 'e1', name: '火柴', quantity: 12 });
+    expect(r.id).toBe('e1');
+    expect(r.quantity).toBe(12);
+  });
+
+  it('EquipmentUpsertSchema: 拒绝 quantity<1', () => {
+    expect(() => EquipmentUpsertSchema.parse({ characterId: 'c', name: 'x', quantity: 0 })).toThrow();
+  });
+
+  it('EquipmentDeleteSchema', () => {
+    const r = EquipmentDeleteSchema.parse({ characterId: 'char_1', id: 'e_existing' });
+    expect(r.id).toBe('e_existing');
+  });
+
+  it('DB 端到端：创建角色 → upsert → delete 武器', async () => {
+    const user = await prisma.user.create({
+      data: { username: 'kp_weap', provider: 'LOCAL', passwordHash: 'x' },
+    });
+    const char = await prisma.character.create({
+      data: {
+        ownerId: user.id, name: '调查员', era: 'modern',
+        str: 60, con: 70, siz: 50, dex: 60, app: 50, int: 65, pow: 50, edu: 70, luck: 50,
+        hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
+        hpCurrent: 12, mpCurrent: 10, sanCurrent: 50, luckCurrent: 50,
+      },
+    });
+
+    const upserted = WeaponUpsertSchema.parse({
+      characterId: char.id,
+      name: '左轮', skill: '手枪', damage: '1d10',
+      range: '15m', ammo: 6,
+    });
+    const w = await prisma.weapon.create({
+      data: {
+        characterId: upserted.characterId,
+        name: upserted.name, skill: upserted.skill, damage: upserted.damage,
+        range: upserted.range ?? null, ammo: upserted.ammo ?? null,
+      },
+    });
+    expect(w.name).toBe('左轮');
+
+    // 模拟编辑
+    await prisma.weapon.update({
+      where: { id: w.id },
+      data: { ammo: 12 },
+    });
+    const got = await prisma.weapon.findUnique({ where: { id: w.id } });
+    expect(got?.ammo).toBe(12);
+
+    // 模拟删除
+    const del = WeaponDeleteSchema.parse({ characterId: char.id, id: w.id });
+    await prisma.weapon.delete({ where: { id: del.id } });
+    const after = await prisma.weapon.findUnique({ where: { id: w.id } });
+    expect(after).toBeNull();
   });
 });

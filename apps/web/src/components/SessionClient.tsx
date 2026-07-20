@@ -17,6 +17,7 @@ import { JudgmentQueue } from './session/JudgmentQueue';
 import { HpChangePanel } from './session/HpChangePanel';
 import { DiceRoller } from './session/DiceRoller';
 import { CharacterCardsPanel } from './session/CharacterCardsPanel';
+import { CharacterDetailModal, type CharacterDetail } from './session/CharacterDetailModal';
 
 interface Member {
   userId: string;
@@ -35,6 +36,8 @@ interface Member {
     str: number; con: number; siz: number; dex: number;
     app: number; int: number; pow: number; edu: number;
     skills: Array<{ name: string; value: number; isMythos: boolean }>;
+    weapons: Array<{ id: string; name: string; skill: string; damage: string; range?: string | null; ammo?: number | null; note?: string | null }>;
+    equipment: Array<{ id: string; name: string; quantity: number; note?: string | null }>;
   };
 }
 
@@ -55,6 +58,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   const [oocMessages, setOocMessages] = useState<OOCMessage[]>([]);
   const [icMessages, setIcMessages] = useState<ICMessage[]>([]);
   const [pendingJudgments, setPendingJudgments] = useState<JudgmentCreatedEvent[]>([]);
+  const [inspectingCharacterId, setInspectingCharacterId] = useState<string | null>(null);
   const socketRef = useRef<Awaited<ReturnType<typeof getSocket>> | null>(null);
 
   const me = members.find((m) => m.userId === currentUserId);
@@ -241,6 +245,14 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           };
         }));
       });
+
+      // 角色库更新（KP 改了武器/物品，或 HP/SAN 变动）→ 用服务端推送的快照直接覆盖本地
+      s.on(SOCKET_EVENTS.CHARACTER_UPDATED, ({ characterId, character }: { characterId: string; character?: any }) => {
+        if (!character) return;
+        setMembers((prev) => prev.map((m) => (
+          m.character?.id === characterId ? { ...m, character } : m
+        )));
+      });
     });
 
     return () => {
@@ -264,6 +276,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       socket.off(SOCKET_EVENTS.JUDGMENT_CANCELLED);
       socket.off(SOCKET_EVENTS.CLOCK_STATE);
       socket.off(SOCKET_EVENTS.PRESENCE_UPDATE);
+      socket.off(SOCKET_EVENTS.CHARACTER_UPDATED);
     };
   }, [sessionId]);
 
@@ -303,6 +316,45 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     socketRef.current?.emit(SOCKET_EVENTS.DICE_ROLL, { sessionId, title, description, diceExpr });
   }, [sessionId]);
 
+  const weaponUpsert = useCallback((payload: {
+    characterId: string; id?: string; name: string; skill: string;
+    damage: string; range?: string; ammo?: number; note?: string;
+  }) => {
+    socketRef.current?.emit(SOCKET_EVENTS.WEAPON_UPSERT, { sessionId, ...payload });
+  }, [sessionId]);
+
+  const weaponDelete = useCallback((characterId: string, id: string) => {
+    socketRef.current?.emit(SOCKET_EVENTS.WEAPON_DELETE, { sessionId, characterId, id });
+  }, [sessionId]);
+
+  const equipmentUpsert = useCallback((payload: {
+    characterId: string; id?: string; name: string; quantity: number; note?: string;
+  }) => {
+    socketRef.current?.emit(SOCKET_EVENTS.EQUIPMENT_UPSERT, { sessionId, ...payload });
+  }, [sessionId]);
+
+  const equipmentDelete = useCallback((characterId: string, id: string) => {
+    socketRef.current?.emit(SOCKET_EVENTS.EQUIPMENT_DELETE, { sessionId, characterId, id });
+  }, [sessionId]);
+
+  // 当前正在查看的车卡：找到 members 里那个 character 数据
+  const inspected = inspectingCharacterId
+    ? members.find((m) => m.character?.id === inspectingCharacterId)?.character ?? null
+    : null;
+  const inspectedOwner = inspectingCharacterId
+    ? members.find((m) => m.character?.id === inspectingCharacterId)
+    : null;
+
+  // Esc 关闭弹窗
+  useEffect(() => {
+    if (!inspectingCharacterId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setInspectingCharacterId(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [inspectingCharacterId]);
+
   return (
     <div className="flex-1 flex flex-col">
       {!connected && (
@@ -333,7 +385,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
         <div className="flex flex-col gap-2 min-h-0">
           <ClockPanel clock={clock} role={role} onControl={controlClock} />
-          {role === 'KP' && me?.character && (
+          {role === 'KP' && (
             <HpChangePanel
               characters={members.filter((m) => m.character).map((m) => ({
                 id: m.character!.id, name: m.character!.name,
@@ -387,9 +439,24 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         </div>
       </div>
 
-      <CharacterCardsPanel members={members} />
+      <CharacterCardsPanel
+        members={members}
+        onSelectCharacter={(id) => setInspectingCharacterId(id)}
+      />
 
       <PresenceBar members={members} />
+
+      {/* 角色详情弹窗：所有人均可看，KP 额外获得武器/物品的编辑入口 */}
+      <CharacterDetailModal
+        character={inspected as CharacterDetail | null}
+        ownerUsername={inspectedOwner?.username}
+        isKp={role === 'KP'}
+        onClose={() => setInspectingCharacterId(null)}
+        onWeaponUpsert={weaponUpsert}
+        onWeaponDelete={weaponDelete}
+        onEquipmentUpsert={equipmentUpsert}
+        onEquipmentDelete={equipmentDelete}
+      />
     </div>
   );
 }

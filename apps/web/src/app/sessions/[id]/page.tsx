@@ -18,7 +18,13 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         where: { leftAt: null },
         include: {
           user: { select: { id: true, username: true, avatarUrl: true } },
-          character: { select: { id: true, name: true, str: true, con: true, siz: true, dex: true, app: true, int: true, pow: true, edu: true, hpCurrent: true, hpMax: true, sanCurrent: true, sanMax: true, mpCurrent: true, mpMax: true, luckCurrent: true, skills: true, damageBonus: true } },
+          character: {
+            include: {
+              skills: true,
+              weapons: true,
+              equipment: true,
+            },
+          },
         },
       },
     },
@@ -84,6 +90,13 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             luck: m.character.luckCurrent,
             damageBonus: m.character.damageBonus,
             skills: m.character.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
+            weapons: m.character.weapons.map((w) => ({
+              id: w.id, name: w.name, skill: w.skill, damage: w.damage,
+              range: w.range, ammo: w.ammo, note: w.note,
+            })),
+            equipment: m.character.equipment.map((e) => ({
+              id: e.id, name: e.name, quantity: e.quantity, note: e.note,
+            })),
           } : undefined,
         }))}
       />

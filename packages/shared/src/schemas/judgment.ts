@@ -48,7 +48,47 @@ export const DiceRollCreateSchema = z.object({
   diceExpr: DiceExpr,
 });
 
+/**
+ * KP 即时编辑 PL 的武器库：一句话创建或更新一条 weapon。
+ * 不带 id = 新建（服务端用 cuid 生成）；带 id = 更新已存在记录。
+ */
+export const WeaponUpsertSchema = z.object({
+  characterId: z.string().min(1),
+  id: z.string().optional(),            // 为空时新增
+  name: z.string().min(1).max(40),
+  skill: z.string().min(1).max(40),
+  damage: z.string().min(1).max(20),
+  range: z.string().max(20).optional(),
+  ammo: z.number().int().min(0).max(9999).optional(),
+  note: z.string().max(200).optional(),
+});
+
+export const WeaponDeleteSchema = z.object({
+  characterId: z.string().min(1),
+  id: z.string().min(1),
+});
+
+/**
+ * KP 即时编辑 PL 的物品库。
+ */
+export const EquipmentUpsertSchema = z.object({
+  characterId: z.string().min(1),
+  id: z.string().optional(),
+  name: z.string().min(1).max(60),
+  quantity: z.number().int().min(1).max(9999).default(1),
+  note: z.string().max(200).optional(),
+});
+
+export const EquipmentDeleteSchema = z.object({
+  characterId: z.string().min(1),
+  id: z.string().min(1),
+});
+
 export type JudgmentCreate = z.infer<typeof JudgmentCreateSchema>;
 export type JudgmentRoll = z.infer<typeof JudgmentRollSchema>;
 export type HpDiceRoll = z.infer<typeof HpDiceRollSchema>;
 export type DiceRollCreate = z.infer<typeof DiceRollCreateSchema>;
+export type WeaponUpsert = z.infer<typeof WeaponUpsertSchema>;
+export type WeaponDelete = z.infer<typeof WeaponDeleteSchema>;
+export type EquipmentUpsert = z.infer<typeof EquipmentUpsertSchema>;
+export type EquipmentDelete = z.infer<typeof EquipmentDeleteSchema>;
