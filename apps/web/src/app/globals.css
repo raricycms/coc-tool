@@ -2,111 +2,117 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────
+   马卡龙蓝色系 · 全局基础
+   ────────────────────────────────────────────────────────── */
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-html,
-body {
-  /* 深蓝石板底 + 两处柔和的紫/靛光晕，让毛玻璃面板浮起来 */
+html, body {
   background:
-    radial-gradient(1100px 600px at 12% -12%, rgba(124, 58, 237, 0.20), transparent 60%),
-    radial-gradient(1000px 700px at 112% 8%, rgba(56, 78, 140, 0.22), transparent 55%),
-    #0b1020;
+    radial-gradient(900px 480px at 0% -10%, rgba(126, 182, 241, 0.20), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, rgba(189, 212, 241, 0.28), transparent 60%),
+    #f6f9fc;
   background-attachment: fixed;
-  color: #f1f5f9;
-  font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  color: #22344f; /* ink */
+  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* ---------- 按钮 ---------- */
+/* 「折纸」背景点纹：仅在 .dotted-bg 容器里渲染，避免全屏噪点 */
+.dotted-bg {
+  background-image: radial-gradient(rgba(126, 182, 241, 0.18) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+/* ──────────────────────────────────────────────────────────
+   按钮
+   ────────────────────────────────────────────────────────── */
+
 .btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 font-medium transition duration-150;
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed;
 }
 
 .btn-primary {
-  @apply btn text-white;
-  background-image: linear-gradient(135deg, #7c3aed, #6d28d9);
-  box-shadow: 0 8px 24px -10px rgba(124, 58, 237, 0.7);
+  @apply btn text-white shadow-lift;
+  background-image: linear-gradient(135deg, #7eb6f1, #5894dd);
 }
-.btn-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-.btn-primary:disabled {
-  @apply opacity-40;
-}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.04); transform: translateY(-1px); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); filter: brightness(0.98); }
+.btn-primary:disabled { @apply opacity-50; }
 
 .btn-ghost {
-  @apply btn border border-white/10 bg-white/[0.05] text-ink-100 backdrop-blur-sm;
+  @apply btn border border-sky-300 bg-white text-ink hover:bg-sky-50 hover:border-macaron-300;
 }
-.btn-ghost:hover:not(:disabled) {
-  @apply bg-white/[0.1] border-white/20;
+.btn-ghost:disabled { @apply opacity-50; }
+
+.btn-soft {
+  @apply btn bg-macaron-100 text-macaron-600 hover:bg-macaron-200;
 }
-.btn-ghost:disabled {
-  @apply opacity-40;
-}
+.btn-soft:disabled { @apply opacity-50; }
 
 .btn-danger {
-  @apply btn border border-red-500/30 bg-red-500/15 text-red-200 backdrop-blur-sm;
-}
-.btn-danger:hover:not(:disabled) {
-  @apply bg-red-500/25 border-red-500/50;
+  @apply btn bg-bad/15 text-bad border border-bad/40 hover:bg-bad/25;
 }
 
-/* ---------- 输入框 ---------- */
+/* ──────────────────────────────────────────────────────────
+   输入框
+   ────────────────────────────────────────────────────────── */
+
 .input {
-  @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[15px] text-ink-100 placeholder-ink-100/35 backdrop-blur-sm transition duration-150;
+  @apply w-full rounded-2xl border border-sky-300 bg-white px-3.5 py-2.5 text-[15px] text-ink placeholder-sky-400 transition;
 }
 .input:focus {
-  @apply border-brand-500/70 bg-white/[0.07] outline-none ring-2 ring-brand-500/30;
+  @apply outline-none border-macaron-300 ring-4 ring-macaron-100;
 }
 
 .input-error {
-  @apply border-red-500/70 focus:border-red-500/70 focus:ring-red-500/30;
+  @apply border-bad focus:border-bad focus:ring-bad/30;
 }
 
-/* ---------- 卡片 / 玻璃面板 ---------- */
+/* ──────────────────────────────────────────────────────────
+   卡片 / 面板
+   ────────────────────────────────────────────────────────── */
+
 .card {
-  @apply rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl;
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-    0 24px 48px -28px rgba(0, 0, 0, 0.85);
+  @apply rounded-3xl border border-sky-200 bg-white p-5 shadow-paper;
 }
 
-/* 卡片内部再嵌一层更淡的分区，用于「添加技能/装备」等小面板 */
 .subpanel {
-  @apply rounded-xl border border-white/10 bg-white/[0.02] p-3.5;
+  @apply rounded-2xl border border-sky-200 bg-sky-50 p-4;
 }
 
-/* ---------- 文字 ---------- */
+/* ──────────────────────────────────────────────────────────
+   文字 / 标签
+   ────────────────────────────────────────────────────────── */
+
 .label {
-  @apply block text-sm font-medium text-ink-100/80 mb-1.5;
+  @apply block text-sm font-medium text-ink-soft mb-1.5;
 }
 
 .error-text {
-  @apply text-sm text-red-300 mt-1;
+  @apply text-sm text-bad mt-1;
 }
 
-/* ---------- 下拉菜单 ---------- */
-/* 原生 <option> 弹层由系统绘制，.input 的玻璃面板样式不一定生效，
-   这里显式指定深色背景 + 浅色文字，避免白底白字看不清。 */
-select option {
-  background-color: #1e293b; /* ink-800 */
-  color: #f1f5f9;            /* ink-100 */
-}
-select option:checked {
-  background-color: #312e81; /* indigo-900 作为高亮 */
-  color: #f1f5f9;
+.muted {
+  @apply text-ink-muted;
 }
 
-/* ---------- 无障碍 ---------- */
+/* 原生 <option> 在白底上可能黑字看不清，这里覆盖一下 */
+select option { color: #22344f; background-color: #ffffff; }
+select option:checked { background-color: #dceefc; color: #22344f; }
+
+/* ──────────────────────────────────────────────────────────
+   无障碍
+   ────────────────────────────────────────────────────────── */
+
 :where(button, a, input, select, textarea):focus-visible {
-  @apply outline-none ring-2 ring-brand-500/50;
+  @apply outline-none ring-2 ring-macaron-300 ring-offset-2 ring-offset-sky-50;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-  }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

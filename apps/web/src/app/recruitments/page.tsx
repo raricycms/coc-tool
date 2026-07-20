@@ -17,35 +17,47 @@ export default async function RecruitmentsListPage() {
   });
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-5xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">招募列表</h1>
-        <div className="flex gap-2">
-          <Link href="/dashboard" className="btn-ghost text-sm">← 返回</Link>
-          <Link href="/recruitments/new" className="btn-primary text-sm">+ 发布招募</Link>
-        </div>
-      </header>
+    <main className="mx-auto max-w-5xl px-4 py-10">
+      <PageHeader
+        title="招募"
+        actions={<Link href="/recruitments/new" className="btn-primary text-sm">＋ 发布招募</Link>}
+      />
 
       {list.length === 0 ? (
-        <div className="card text-center text-ink-100/60 py-12">暂无公开招募。</div>
+        <div className="card py-12 text-center text-ink-soft">暂无公开招募。</div>
       ) : (
-        <div className="grid gap-3">
+        <ul className="grid gap-4 sm:grid-cols-2">
           {list.map((r) => (
-            <Link key={r.id} href={`/recruitments/${r.id}`} className="card hover:border-brand-500 transition-colors">
-              <div className="flex items-start justify-between mb-2">
-                <h2 className="font-bold">{r.title}</h2>
-                <span className="text-xs text-ink-100/40">KP: @{r.kp.username}</span>
-              </div>
-              <p className="text-sm text-ink-100/70 line-clamp-2 mb-2">{r.summary}</p>
-              <div className="flex gap-3 text-xs text-ink-100/50">
-                <span>已批准 {r._count.applications}/{r.maxPlayers}</span>
-                {r.scenario && <span>剧本: {r.scenario}</span>}
-                {r.expectedHours && <span>{r.expectedHours}h</span>}
-              </div>
-            </Link>
+            <li key={r.id}>
+              <Link href={`/recruitments/${r.id}`} className="card block transition hover:-translate-y-0.5 hover:shadow-lift">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="truncate text-lg font-bold text-ink">{r.title}</h2>
+                  <span className="shrink-0 rounded-full bg-ok/15 px-2 py-0.5 text-[11px] font-semibold text-ok">招募中</span>
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-ink-soft">{r.summary}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-ink-muted">
+                  <span>已通过 {r._count.applications}/{r.maxPlayers}</span>
+                  {r.scenario && <span>· {r.scenario}</span>}
+                  {r.expectedHours && <span>· 预计 {r.expectedHours} 小时</span>}
+                </div>
+                <div className="mt-3 text-xs text-ink-muted">KP @{r.kp.username}</div>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </main>
+  );
+}
+
+function PageHeader({ title, actions }: { title: string; actions?: React.ReactNode }) {
+  return (
+    <header className="mb-8 flex items-end justify-between gap-3">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">{title}</h1>
+        <p className="mt-1 text-sm text-ink-soft">找一个团，或者发起一个。</p>
+      </div>
+      <div className="flex gap-2">{actions}</div>
+    </header>
   );
 }

@@ -33,45 +33,51 @@ export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName
   const canSendDialogue = (role === 'KP') || (role === 'PL' && !!myCharacterId);
 
   return (
-    <div className="card flex-1 flex flex-col min-h-0">
-      <h3 className="font-bold mb-2 text-ink-100/80">画内 (IC)</h3>
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto space-y-2 text-sm min-h-0">
+    <div className="card flex min-h-0 flex-1 flex-col">
+      <header className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画内 · IC</h3>
+        <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
+      </header>
+      <div ref={scrollerRef} className="flex-1 space-y-2 overflow-y-auto text-sm min-h-0">
         {messages.length === 0 ? (
-          <p className="text-ink-100/30 text-center py-8">还没有消息</p>
+          <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (
           messages.map((m) => (
-            <div key={m.id} className={`border-l-2 pl-2 ${m.kind === 'desc' ? 'border-brand-500' : 'border-ink-800'}`}>
-              <div className="text-xs text-ink-100/40">
+            <div
+              key={m.id}
+              className={`border-l-2 pl-2.5 ${m.kind === 'desc' ? 'border-macaron-300' : 'border-sky-200'}`}
+            >
+              <div className="text-[11px] text-ink-soft">
                 {m.kind === 'desc' ? (
-                  <span className="text-brand-500">[KP 描述]</span>
+                  <span className="font-semibold text-macaron-600">[主持人描述]</span>
                 ) : (
-                  <span>{m.characterName ?? m.authorUsername}</span>
+                  <span className="font-semibold text-ink">{m.characterName ?? m.authorUsername}</span>
                 )}
                 {' · '}
                 {m.inGameDate} {m.inGameTime}
               </div>
-              <div className="whitespace-pre-wrap">{m.content}</div>
+              <div className="whitespace-pre-wrap text-ink">{m.content}</div>
             </div>
           ))
         )}
       </div>
       {(canSendDesc || canSendDialogue) && (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-3 flex gap-2">
           {canSendDesc && (
-            <select className="input w-24" value={kind} onChange={(e) => setKind(e.target.value as any)}>
-              <option value="desc">KP 描述</option>
+            <select className="input w-32 shrink-0" value={kind} onChange={(e) => setKind(e.target.value as any)}>
+              <option value="desc">主持人描述</option>
               <option value="dialogue">{myCharacterName ?? '角色'} 发言</option>
             </select>
           )}
           {!canSendDesc && canSendDialogue && (
-            <span className="text-xs text-ink-100/40 self-center">以 {myCharacterName} 发言</span>
+            <span className="self-center text-xs text-ink-soft">以 {myCharacterName} 发言</span>
           )}
           <input
             className="input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder={kind === 'desc' ? 'KP 描述...' : '角色发言...'}
+            placeholder={kind === 'desc' ? '描述场景、气氛、NPC 反应…' : '角色在说什么？'}
             maxLength={2000}
           />
           <button className="btn-primary" onClick={send}>发送</button>

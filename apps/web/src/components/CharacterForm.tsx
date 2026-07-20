@@ -53,6 +53,14 @@ function rollPrimary(): PrimaryStats {
   };
 }
 
+const STEPS = [
+  { n: 1, label: '基础' },
+  { n: 2, label: '属性' },
+  { n: 3, label: '技能' },
+  { n: 4, label: '装备' },
+  { n: 5, label: '背景' },
+] as const;
+
 export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = {}) {
   const editingId = initial?.id;
   const router = useRouter();
@@ -82,7 +90,6 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
 
   const randomPrimary = () => {
     setPrimary(rollPrimary());
-    // 随机生成后旧属性错误已无关，清掉
     for (const k of ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const) {
       clear(`primary.${k}`);
     }
@@ -136,38 +143,43 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        {[
-          { n: 1, label: '基础' },
-          { n: 2, label: '属性' },
-          { n: 3, label: '技能' },
-          { n: 4, label: '装备' },
-          { n: 5, label: '背景' },
-        ].map(({ n, label }) => (
-          <div
-            key={n}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-sm transition ${
-              step === n
-                ? 'border-brand-500/50 bg-brand-600/90 text-white shadow-[0_8px_24px_-12px_rgba(124,58,237,0.8)]'
-                : step > n
-                  ? 'border-white/10 bg-white/[0.06] text-ink-100/70'
-                  : 'border-white/10 bg-white/[0.02] text-ink-100/40'
-            }`}
-          >
-            <span className="font-semibold">{n}</span>
-            <span className="hidden sm:inline">{label}</span>
-          </div>
-        ))}
-      </div>
+      {/* 步骤条 */}
+      <ol className="flex items-center gap-2 overflow-x-auto">
+        {STEPS.map(({ n, label }) => {
+          const state = step === n ? 'current' : step > n ? 'done' : 'todo';
+          const cls =
+            state === 'current'
+              ? 'border-macaron-300 bg-macaron-300 text-white shadow-lift'
+              : state === 'done'
+                ? 'border-macaron-200 bg-macaron-100 text-macaron-600'
+                : 'border-sky-200 bg-white text-ink-muted';
+          return (
+            <li
+              key={n}
+              className={`flex flex-1 min-w-[5rem] items-center justify-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition ${cls}`}
+              aria-current={state === 'current' ? 'step' : undefined}
+            >
+              <span className="font-bold">{n}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </li>
+          );
+        })}
+      </ol>
 
       {step === 1 && (
-        <div className="card space-y-4">
-          <h2 className="font-bold">基础信息</h2>
+        <div className="card space-y-5">
+          <header>
+            <h2 className="text-lg font-bold text-ink">基础信息</h2>
+            <p className="mt-1 text-sm text-ink-soft">从名字和身世开始。</p>
+          </header>
+
           <FieldError error={get('name')}>
-            <label className="label">姓名 *</label>
+            <label className="label">姓名 <span className="text-bad">*</span></label>
             <input className="input" value={name} onChange={(e) => { setName(e.target.value); clear('name'); }} required />
           </FieldError>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* 每一格是一个完整字段组（label + input），不再横排交叉 */}
+          <div className="grid gap-4 sm:grid-cols-2">
             <FieldError error={get('gender')}>
               <label className="label">性别</label>
               <select className="input" value={gender} onChange={(e) => { setGender(e.target.value as any); clear('gender'); }}>
@@ -182,8 +194,9 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
               <input type="number" className="input" value={age} min={15} max={90} onChange={(e) => { setAge(parseInt(e.target.value)); clear('age'); }} />
             </FieldError>
           </div>
+
           <FieldError error={get('era')}>
-            <label className="label">时代 *</label>
+            <label className="label">时代 <span className="text-bad">*</span></label>
             <select className="input" value={era} onChange={(e) => { setEra(e.target.value as any); clear('era'); }}>
               <option value="modern">现代</option>
               <option value="1920s">1920s</option>
@@ -192,7 +205,8 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
               <option value="future">未来</option>
             </select>
           </FieldError>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <FieldError error={get('occupation')}>
               <label className="label">职业</label>
               <input className="input" value={occupation} onChange={(e) => { setOccupation(e.target.value); clear('occupation'); }} placeholder="私家侦探 / 记者 / ..." />
@@ -202,7 +216,8 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
               <input className="input" value={nationality} onChange={(e) => { setNationality(e.target.value); clear('nationality'); }} />
             </FieldError>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <FieldError error={get('birthplace')}>
               <label className="label">出生地</label>
               <input className="input" value={birthplace} onChange={(e) => { setBirthplace(e.target.value); clear('birthplace'); }} />
@@ -216,19 +231,25 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
       )}
 
       {step === 2 && (
-        <div className="card space-y-4">
+        <div className="card space-y-5">
           <header className="flex items-center justify-between">
-            <h2 className="font-bold">属性</h2>
-            <button type="button" onClick={randomPrimary} className="btn-ghost text-sm">🎲 随机生成</button>
+            <div>
+              <h2 className="text-lg font-bold text-ink">基础属性</h2>
+              <p className="mt-1 text-sm text-ink-soft">不会写？就交给骰子。</p>
+            </div>
+            <button type="button" onClick={randomPrimary} className="btn-soft text-sm">🎲 随机生成</button>
           </header>
-          <div className="space-y-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {(['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const).map((k) => (
               <FieldError key={k} error={get(`primary.${k}`)}>
-                <div className="flex items-center gap-3">
-                  <label className="label uppercase w-12 shrink-0">{k}</label>
-                  <input type="number" className="input flex-1" value={primary[k]} min={1}
-                    onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }} />
-                </div>
+                <label className="label uppercase">{k}</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={primary[k]}
+                  min={1}
+                  onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }}
+                />
               </FieldError>
             ))}
           </div>
@@ -236,146 +257,228 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
       )}
 
       {step === 3 && (
-        <div className="card space-y-4">
-          <h2 className="font-bold">技能</h2>
-          <div className="max-h-96 overflow-y-auto space-y-2">
+        <div className="card space-y-5">
+          <header>
+            <h2 className="text-lg font-bold text-ink">技能</h2>
+            <p className="mt-1 text-sm text-ink-soft">勾选「克苏鲁神话」会让该技能以紫色显示。</p>
+          </header>
+
+          <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
             {skills.map((s, i) => (
-              <div key={i} className="flex gap-2 items-start">
+              <li key={i} className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <FieldError error={get(`skills.${i}.name`)}>
                   <input
-                    className="input flex-1"
+                    className="input flex-1 min-w-[8rem]"
                     placeholder="技能名称"
                     value={s.name}
                     onChange={(e) => {
-                      const c = [...skills];
-                      c[i] = { ...c[i], name: e.target.value };
-                      setSkills(c);
+                      const c = [...skills]; c[i] = { ...c[i], name: e.target.value }; setSkills(c);
                       clear(`skills.${i}.name`);
                     }}
                   />
                 </FieldError>
-                <div className="w-28">
-                  <FieldError error={get(`skills.${i}.value`)}>
-                    <input type="number" className="input" value={s.value} min={0}
-                      onChange={(e) => {
-                        const c = [...skills]; c[i] = { ...c[i], value: parseInt(e.target.value) || 0 }; setSkills(c);
-                        clear(`skills.${i}.value`);
-                      }} />
-                  </FieldError>
-                </div>
-                <label className="flex items-center gap-1 text-xs whitespace-nowrap pt-2" title="标记为 Cthulhu Mythos">
+                <FieldError error={get(`skills.${i}.value`)}>
                   <input
-                    type="checkbox"
-                    checked={!!s.isMythos}
+                    type="number"
+                    className="input w-24"
+                    value={s.value}
+                    min={0}
                     onChange={(e) => {
-                      const c = [...skills];
-                      c[i] = { ...c[i], isMythos: e.target.checked };
-                      setSkills(c);
+                      const c = [...skills]; c[i] = { ...c[i], value: parseInt(e.target.value) || 0 }; setSkills(c);
+                      clear(`skills.${i}.value`);
                     }}
                   />
-                  Mythos
+                </FieldError>
+                <label className="inline-flex items-center gap-1 text-xs text-ink-soft">
+                  <input
+                    type="checkbox"
+                    className="rounded border-sky-300 text-mythos focus:ring-mythos"
+                    checked={!!s.isMythos}
+                    onChange={(e) => {
+                      const c = [...skills]; c[i] = { ...c[i], isMythos: e.target.checked }; setSkills(c);
+                    }}
+                  />
+                  克苏鲁神话
                 </label>
-                <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setSkills(skills.filter((_, j) => j !== i))}>删除</button>
-              </div>
+                <button
+                  type="button"
+                  className="btn-ghost text-xs"
+                  onClick={() => setSkills(skills.filter((_, j) => j !== i))}
+                >
+                  删除
+                </button>
+              </li>
             ))}
-          </div>
-          <div className="subpanel">
-            <p className="label mb-2">添加技能</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input className="input sm:flex-1" placeholder="技能名称" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
-              <div className="flex gap-2">
-                <input type="number" className="input w-24 sm:w-28" placeholder="初始值" value={newSkill.value} min={0}
+          </ul>
+
+          <div className="subpanel space-y-3">
+            <p className="text-sm font-semibold text-ink">添加新技能</p>
+            <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
+              <div>
+                <label className="label text-xs">名称</label>
+                <input className="input" placeholder="技能名称" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="label text-xs">初始值</label>
+                <input type="number" className="input" value={newSkill.value} min={0}
                   onChange={(e) => setNewSkill({ ...newSkill, value: parseInt(e.target.value) || 0 })} />
-                <button type="button" className="btn-primary flex-1 whitespace-nowrap sm:flex-none" onClick={() => {
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
                   if (newSkill.name) {
                     setSkills([...skills, newSkill]);
                     setNewSkill({ name: '', value: 50 });
                   }
-                }}>+ 添加</button>
-              </div>
+                }}
+              >
+                ＋ 添加
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {step === 4 && (
-        <div className="space-y-4">
-          <div className="card space-y-3">
-            <h2 className="font-bold">武器</h2>
-            {weapons.map((w, i) => (
-              <div key={i} className="flex gap-2 text-sm">
-                <span className="flex-1">{w.name} ({w.skill}, {w.damage})</span>
-                <button type="button" className="btn-ghost text-xs px-2 py-1" onClick={() => setWeapons(weapons.filter((_, j) => j !== i))}>删除</button>
-              </div>
-            ))}
-            <div className="subpanel space-y-2">
-              <p className="label mb-0">添加武器</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <input className="input" placeholder="武器名称" value={newWeapon.name} onChange={(e) => setNewWeapon({ ...newWeapon, name: e.target.value })} />
-                <input className="input" placeholder="使用技能" value={newWeapon.skill} onChange={(e) => setNewWeapon({ ...newWeapon, skill: e.target.value })} />
-                <input className="input" placeholder="伤害" value={newWeapon.damage} onChange={(e) => setNewWeapon({ ...newWeapon, damage: e.target.value })} />
-                <input className="input" placeholder="射程（可选）" value={newWeapon.range} onChange={(e) => setNewWeapon({ ...newWeapon, range: e.target.value })} />
-              </div>
-              <button type="button" className="btn-primary w-full sm:w-auto" onClick={() => {
-                if (newWeapon.name) {
-                  setWeapons([...weapons, newWeapon]);
-                  setNewWeapon({ name: '', skill: '', damage: '', range: '' });
-                }
-              }}>+ 添加武器</button>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <section className="card space-y-4">
+            <header>
+              <h2 className="text-lg font-bold text-ink">武器</h2>
+              <p className="mt-1 text-sm text-ink-soft">填写名称、使用技能、伤害表达式。</p>
+            </header>
 
-          <div className="card space-y-3">
-            <h2 className="font-bold">装备</h2>
-            {equipment.map((e, i) => (
-              <div key={i} className="flex gap-2 text-sm items-start">
-                <span className="flex-1 pt-2">{e.name} × {e.quantity}</span>
-                <button type="button" className="btn-ghost text-xs px-2 py-1 mt-1" onClick={() => setEquipment(equipment.filter((_, j) => j !== i))}>删除</button>
+            {weapons.length === 0 ? (
+              <p className="text-sm text-ink-soft">还没添加武器。</p>
+            ) : (
+              <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
+                {weapons.map((w, i) => (
+                  <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <span className="flex-1 font-semibold text-ink">{w.name}</span>
+                    <span className="text-xs text-ink-soft">{w.skill} · {w.damage}{w.range ? ` · ${w.range}` : ''}</span>
+                    <button type="button" className="btn-ghost text-xs" onClick={() => setWeapons(weapons.filter((_, j) => j !== i))}>
+                      删除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="subpanel space-y-3">
+              <p className="text-sm font-semibold text-ink">添加武器</p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="label text-xs">名称</label>
+                  <input className="input" value={newWeapon.name} onChange={(e) => setNewWeapon({ ...newWeapon, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label text-xs">使用技能</label>
+                  <input className="input" value={newWeapon.skill} onChange={(e) => setNewWeapon({ ...newWeapon, skill: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label text-xs">伤害表达式</label>
+                  <input className="input font-mono" placeholder="1d6" value={newWeapon.damage} onChange={(e) => setNewWeapon({ ...newWeapon, damage: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label text-xs">射程（可选）</label>
+                  <input className="input" value={newWeapon.range} onChange={(e) => setNewWeapon({ ...newWeapon, range: e.target.value })} />
+                </div>
               </div>
-            ))}
-            <div className="subpanel">
-              <p className="label mb-2">添加装备</p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input className="input sm:flex-1" placeholder="装备名称" value={newEquip.name} onChange={(e) => setNewEquip({ ...newEquip, name: e.target.value })} />
-                <div className="flex gap-2">
-                  <input type="number" className="input w-24 sm:w-28" placeholder="数量" value={newEquip.quantity} min={1}
+              <div className="flex justify-end">
+                <button type="button" className="btn-primary" onClick={() => {
+                  if (newWeapon.name) {
+                    setWeapons([...weapons, newWeapon]);
+                    setNewWeapon({ name: '', skill: '', damage: '', range: '' });
+                  }
+                }}>
+                  ＋ 添加武器
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="card space-y-4">
+            <header>
+              <h2 className="text-lg font-bold text-ink">装备</h2>
+              <p className="mt-1 text-sm text-ink-soft">背包、工具、信物……任意你想要的道具。</p>
+            </header>
+
+            {equipment.length === 0 ? (
+              <p className="text-sm text-ink-soft">还没添加装备。</p>
+            ) : (
+              <ul className="divide-y divide-sky-100 rounded-2xl border border-sky-200">
+                {equipment.map((e, i) => (
+                  <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
+                    <span className="flex-1 font-semibold text-ink">{e.name}</span>
+                    <span className="text-xs text-ink-soft">× {e.quantity}</span>
+                    <button type="button" className="btn-ghost text-xs" onClick={() => setEquipment(equipment.filter((_, j) => j !== i))}>
+                      删除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="subpanel space-y-3">
+              <p className="text-sm font-semibold text-ink">添加装备</p>
+              <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
+                <div>
+                  <label className="label text-xs">名称</label>
+                  <input className="input" value={newEquip.name} onChange={(e) => setNewEquip({ ...newEquip, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label text-xs">数量</label>
+                  <input type="number" className="input" value={newEquip.quantity} min={1}
                     onChange={(e) => setNewEquip({ ...newEquip, quantity: parseInt(e.target.value) || 1 })} />
-                  <button type="button" className="btn-primary flex-1 whitespace-nowrap sm:flex-none" onClick={() => {
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
                     if (newEquip.name) {
                       setEquipment([...equipment, newEquip]);
                       setNewEquip({ name: '', quantity: 1 });
                     }
-                  }}>+ 添加</button>
-                </div>
+                  }}
+                >
+                  ＋ 添加
+                </button>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
       {step === 5 && (
-        <div className="card space-y-4">
-          <h2 className="font-bold">背景 & 备注</h2>
+        <div className="card space-y-5">
+          <header>
+            <h2 className="text-lg font-bold text-ink">背景与备注</h2>
+            <p className="mt-1 text-sm text-ink-soft">背景会在游戏内展示给其他玩家；备注只有你本人能看。</p>
+          </header>
           <FieldError error={get('background')}>
             <label className="label">调查员背景</label>
             <textarea className="input min-h-[200px]" value={background} onChange={(e) => { setBackground(e.target.value); clear('background'); }} />
           </FieldError>
           <FieldError error={get('notes')}>
             <label className="label">玩家私有备注</label>
-            <textarea className="input min-h-[100px]" value={notes} onChange={(e) => { setNotes(e.target.value); clear('notes'); }} />
+            <textarea className="input min-h-[120px]" value={notes} onChange={(e) => { setNotes(e.target.value); clear('notes'); }} />
           </FieldError>
         </div>
       )}
 
       {error && <p className="error-text">{error}</p>}
 
-      <div className="flex justify-between">
-        <button type="button" className="btn-ghost" disabled={step === 1} onClick={() => setStep(step - 1)}>← 上一步</button>
+      <div className="flex justify-between gap-2">
+        <button type="button" className="btn-ghost" disabled={step === 1} onClick={() => setStep(step - 1)}>
+          ← 上一步
+        </button>
         {step < 5 ? (
-          <button type="button" className="btn-primary" onClick={() => setStep(step + 1)} disabled={step === 1 && !name}>下一步 →</button>
+          <button type="button" className="btn-primary" onClick={() => setStep(step + 1)} disabled={step === 1 && !name}>
+            下一步 →
+          </button>
         ) : (
           <button type="button" className="btn-primary" onClick={submit} disabled={loading}>
-            {loading ? (editingId ? '保存中...' : '创建中...') : (editingId ? '✓ 保存车卡' : '✓ 创建车卡')}
+            {loading ? (editingId ? '保存中…' : '创建中…') : (editingId ? '保存车卡' : '创建车卡')}
           </button>
         )}
       </div>
@@ -390,6 +493,5 @@ function stepForPath(path: (string | number)[]): number | null {
   if (head === 'weapons' || head === 'equipment') return 4;
   if (head === 'background' || head === 'notes') return 5;
   if (head === 'primary') return 2;
-  // name/gender/age/era/occupation/nationality/birthplace/residence → step 1
   return 1;
 }

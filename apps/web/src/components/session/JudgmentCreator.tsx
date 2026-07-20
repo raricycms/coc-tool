@@ -18,7 +18,6 @@ interface CharacterLite {
 
 interface Props {
   characters: CharacterLite[];
-  /** 同 session 内所有 PL 角色（用于群发）。一般是 characters 的子集（剔除 KP 自己）。 */
   plCharacters: CharacterLite[];
   onCreate: (payload: any) => void;
 }
@@ -32,7 +31,6 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
   const [skillName, setSkillName] = useState('');
   const [difficulty, setDifficulty] = useState<'regular' | 'hard' | 'extreme'>('regular');
   const [bonusDice, setBonusDice] = useState(0);
-  // SAN check 新字段：成功/失败的损失骰表达式（默认 1d3 / 1d6）
   const [scSuccessExpr, setScSuccessExpr] = useState('1d3');
   const [scFailureExpr, setScFailureExpr] = useState('1d6');
   const [note, setNote] = useState('');
@@ -56,7 +54,6 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
       skillName,
       difficulty,
       bonusDice,
-      // 仅 SAN 时带表达式字段；其他判定不带
       scSuccessExpr: isSan ? scSuccessExpr : undefined,
       scFailureExpr: isSan ? scFailureExpr : undefined,
       note: note || undefined,
@@ -72,135 +69,122 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
   };
 
   if (!open) {
-    return <button className="btn-primary text-sm" onClick={() => setOpen(true)}>+ 发布判定</button>;
+    return <button className="btn-primary w-full text-sm" onClick={() => setOpen(true)}>＋ 发布判定</button>;
   }
 
   return (
-    <div className="card space-y-2">
-      <h3 className="font-bold text-sm">发布判定</h3>
+    <section className="card space-y-3">
+      <header className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">发布判定</h3>
+        <button className="btn-ghost text-xs" onClick={() => setOpen(false)}>收起</button>
+      </header>
 
-      {/* 群发开关 */}
       {plCharacters.length > 1 && (
-        <label className="flex items-center gap-2 text-xs cursor-pointer">
+        <label className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs text-ink-soft">
           <input
             type="checkbox"
+            className="mt-0.5 rounded border-sky-300 text-macaron-300 focus:ring-macaron-300"
             checked={broadcast}
             onChange={(e) => setBroadcast(e.target.checked)}
           />
-          <span>📢 群发给所有 PL（{plCharacters.length} 个角色）</span>
+          <span>📢 群发给所有 PL（{plCharacters.length} 个角色同时掷骰）</span>
         </label>
       )}
 
       <div>
-        <label className="label text-xs">角色</label>
-        <select
-          className="input text-sm"
-          value={targetId}
-          onChange={(e) => setTargetId(e.target.value)}
-          disabled={broadcast}
-        >
+        <label className="label">判定对象</label>
+        <select className="input" value={targetId} onChange={(e) => setTargetId(e.target.value)} disabled={broadcast}>
           {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         {broadcast && (
-          <p className="text-[10px] text-ink-100/40 mt-1">
-            已选群发，将对 {plCharacters.map((c) => c.name).join('、')} 同时发布判定。
+          <p className="mt-1 text-[11px] text-ink-muted">
+            将对 {plCharacters.map((c) => c.name).join('、')} 同时发布。
           </p>
         )}
       </div>
 
-      <div className="flex gap-2">
-        <button
-          className={`flex-1 text-xs py-1 rounded ${tab === 'skill' ? 'bg-brand-600' : 'bg-ink-800'}`}
-          onClick={() => switchTab('skill')}
-        >技能</button>
-        <button
-          className={`flex-1 text-xs py-1 rounded ${tab === 'attribute' ? 'bg-brand-600' : 'bg-ink-800'}`}
-          onClick={() => switchTab('attribute')}
-        >属性</button>
-        <button
-          className={`flex-1 text-xs py-1 rounded ${tab === 'san' ? 'bg-brand-600' : 'bg-ink-800'}`}
-          onClick={() => switchTab('san')}
-        >SAN check</button>
+      {/* tab：每格独立单元，不再把 label/input 拆到不同列 */}
+      <div className="grid grid-cols-3 gap-1.5">
+        <button className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition ${tab === 'skill' ? 'border-macaron-300 bg-macaron-300 text-white' : 'border-sky-200 bg-white text-ink-soft hover:bg-sky-50'}`} onClick={() => switchTab('skill')}>技能</button>
+        <button className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition ${tab === 'attribute' ? 'border-macaron-300 bg-macaron-300 text-white' : 'border-sky-200 bg-white text-ink-soft hover:bg-sky-50'}`} onClick={() => switchTab('attribute')}>属性</button>
+        <button className={`rounded-2xl border px-3 py-2 text-xs font-semibold transition ${tab === 'san' ? 'border-macaron-300 bg-macaron-300 text-white' : 'border-sky-200 bg-white text-ink-soft hover:bg-sky-50'}`} onClick={() => switchTab('san')}>SAN</button>
       </div>
 
       {tab === 'skill' && (
-        <select className="input text-sm" value={skillName} onChange={(e) => setSkillName(e.target.value)}>
-          {target?.skills.map((s) => (
-            <option key={s.name} value={s.name}>{s.name} ({s.value})</option>
-          ))}
-        </select>
+        <div>
+          <label className="label">技能</label>
+          <select className="input" value={skillName} onChange={(e) => setSkillName(e.target.value)}>
+            {target?.skills.map((s) => (
+              <option key={s.name} value={s.name}>{s.name}（{s.value}）</option>
+            ))}
+          </select>
+        </div>
       )}
 
       {tab === 'attribute' && (
-        <select className="input text-sm" value={skillName} onChange={(e) => setSkillName(e.target.value)}>
-          {PRIMARY_STATS.map(([key, label]) => {
-            const v = target ? (target as any)[key] : 0;
-            return <option key={key} value={label}>{label} ({v})</option>;
-          })}
-        </select>
+        <div>
+          <label className="label">属性</label>
+          <select className="input" value={skillName} onChange={(e) => setSkillName(e.target.value)}>
+            {PRIMARY_STATS.map(([key, label]) => {
+              const v = target ? (target as any)[key] : 0;
+              return <option key={key} value={label}>{label}（{v}）</option>;
+            })}
+          </select>
+        </div>
       )}
 
       {tab === 'san' && (
-        <div className="text-sm text-ink-100/60">SAN: 当前 {target?.sanCurrent}</div>
+        <div className="rounded-2xl bg-sky-50 px-3 py-2 text-sm text-ink-soft">
+          当前 SAN：<span className="font-bold text-ink">{target?.sanCurrent}</span>
+        </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="label text-xs">难度</label>
-          <select className="input text-sm" value={difficulty} onChange={(e) => setDifficulty(e.target.value as any)}>
+          <label className="label">难度</label>
+          <select className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value as any)}>
             <option value="regular">常规</option>
             <option value="hard">困难</option>
             <option value="extreme">极难</option>
           </select>
         </div>
         <div>
-          <label className="label text-xs">奖励/惩罚</label>
-          <select className="input text-sm" value={bonusDice} onChange={(e) => setBonusDice(parseInt(e.target.value))}>
+          <label className="label">奖励 / 惩罚骰</label>
+          <select className="input" value={bonusDice} onChange={(e) => setBonusDice(parseInt(e.target.value))}>
             {[-2, -1, 0, 1, 2].map((b) => <option key={b} value={b}>{b > 0 ? `+${b}` : b}</option>)}
           </select>
         </div>
       </div>
 
       {isSan && (
-        <div className="space-y-1">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="subpanel space-y-3">
+          <p className="text-xs font-semibold text-ink-soft">SAN 损失（成功 / 失败）</p>
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="label text-xs">成功时扣</label>
-              <input
-                type="text"
-                className="input text-sm font-mono"
-                value={scSuccessExpr}
-                placeholder="1d3"
-                onChange={(e) => setScSuccessExpr(e.target.value.trim())}
-              />
+              <input className="input font-mono" value={scSuccessExpr} placeholder="1d3" onChange={(e) => setScSuccessExpr(e.target.value.trim())} />
             </div>
             <div>
               <label className="label text-xs">失败时扣</label>
-              <input
-                type="text"
-                className="input text-sm font-mono"
-                value={scFailureExpr}
-                placeholder="1d6"
-                onChange={(e) => setScFailureExpr(e.target.value.trim())}
-              />
+              <input className="input font-mono" value={scFailureExpr} placeholder="1d6" onChange={(e) => setScFailureExpr(e.target.value.trim())} />
             </div>
           </div>
-          <p className="text-[10px] text-ink-100/40">
-            成功扣 &quot;{scSuccessExpr}&quot;、失败扣 &quot;{scFailureExpr}&quot;。支持 <code>1d3</code> / <code>2d6+1</code> / <code>1d4+1d3</code>，留 <code>0</code> 表示不扣。留空则该项不扣 SAN。
+          <p className="text-[11px] text-ink-muted">
+            支持 <code className="font-mono">1d3</code> / <code className="font-mono">2d6+1</code>，填 0 或留空表示不扣 SAN。
           </p>
         </div>
       )}
 
       <div>
-        <label className="label text-xs">提示（PL 可见）</label>
-        <input className="input text-sm" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+        <label className="label">提示（PL 可见）</label>
+        <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="例：你推开腐朽的木门，霉味扑面而来…" />
       </div>
-      <div className="flex gap-2 justify-end">
+      <div className="flex justify-end gap-2">
         <button className="btn-ghost text-sm" onClick={() => setOpen(false)}>取消</button>
         <button className="btn-primary text-sm" onClick={submit} disabled={!skillName || (!target && !broadcast)}>
           {broadcast ? `群发 ${plCharacters.length} 人` : '发布'}
         </button>
       </div>
-    </div>
+    </section>
   );
 }

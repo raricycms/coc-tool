@@ -13,23 +13,23 @@ export default async function DashboardPage() {
     prisma.character.findMany({
       where: { ownerId: user.id },
       orderBy: { updatedAt: 'desc' },
-      take: 10,
+      take: 5,
     }),
     prisma.session.findMany({
       where: { kpId: user.id },
       orderBy: { updatedAt: 'desc' },
-      take: 10,
+      take: 5,
     }),
     prisma.sessionMember.findMany({
       where: { userId: user.id, role: 'PL' },
       include: { session: true },
       orderBy: { joinedAt: 'desc' },
-      take: 10,
+      take: 5,
     }),
     prisma.recruitment.findMany({
       where: { kpId: user.id },
       orderBy: { updatedAt: 'desc' },
-      take: 10,
+      take: 5,
     }),
     prisma.recruitment.findMany({
       where: { status: 'OPEN', visibility: 'public' },
@@ -40,110 +40,198 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <section className="card">
-          <header className="flex items-center justify-between mb-3">
-            <h2 className="font-bold">我的车卡</h2>
-            <Link href="/characters/new" className="text-sm text-brand-500">+ 新建</Link>
-          </header>
-          {characters.length === 0 ? (
-            <p className="text-ink-100/50 text-sm">还没有车卡。</p>
-          ) : (
-            <ul className="space-y-2">
-              {characters.map((c) => (
-                <li key={c.id}>
-                  <Link href={`/characters/${c.id}`} className="block hover:bg-ink-800 rounded p-2 -mx-2">
-                    <div className="font-medium">{c.name} <span className="text-xs text-ink-100/40">{c.era}</span></div>
-                    <div className="text-xs text-ink-100/50">HP {c.hpCurrent}/{c.hpMax} · SAN {c.sanCurrent}/{c.sanMax} · {c.status === 'ACTIVE' ? '✓' : '⚰'}</div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+    <main className="mx-auto max-w-6xl px-4 py-10 space-y-10">
+      {/* 顶部欢迎条 + 一键动作 */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm text-ink-soft">欢迎回来</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-ink">@{user.username}</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/characters/new" className="btn-primary text-sm">＋ 新建车卡</Link>
+          <Link href="/recruitments/new" className="btn-soft text-sm">＋ 发布招募</Link>
+        </div>
+      </header>
 
-        <section className="card">
-          <header className="flex items-center justify-between mb-3">
-            <h2 className="font-bold">我作为 KP 的团</h2>
-          </header>
-          {asKpSessions.length === 0 ? (
-            <p className="text-ink-100/50 text-sm">暂无</p>
-          ) : (
-            <ul className="space-y-2">
-              {asKpSessions.map((s) => (
-                <li key={s.id}>
-                  <Link href={`/sessions/${s.id}`} className="block hover:bg-ink-800 rounded p-2 -mx-2">
-                    <div className="font-medium">{s.title}</div>
-                    <div className="text-xs text-ink-100/50">{s.status}</div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {/* 1. 我的车卡 */}
+      <section>
+        <SectionTitle title="我的车卡" link={{ href: '/characters', label: '查看全部' }} />
+        {characters.length === 0 ? (
+          <EmptyState text="还没有车卡。" cta={{ href: '/characters/new', label: '立即创建' }} />
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {characters.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/characters/${c.id}`}
+                  className="card block transition hover:-translate-y-0.5 hover:shadow-lift"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-bold text-ink">{c.name}</h3>
+                      <p className="text-xs text-ink-soft">
+                        {c.occupation ?? '无职业'} · {c.era}
+                      </p>
+                    </div>
+                    {c.status === 'RETIRED' && (
+                      <span className="shrink-0 rounded-full bg-bad/15 px-2 py-0.5 text-[10px] font-semibold text-bad">
+                        已退役
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-ink-soft">
+                    <Pill>HP {c.hpCurrent}/{c.hpMax}</Pill>
+                    <Pill>SAN {c.sanCurrent}/{c.sanMax}</Pill>
+                    <Pill>LUCK {c.luckCurrent}</Pill>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-        <section className="card">
-          <header className="flex items-center justify-between mb-3">
-            <h2 className="font-bold">我作为 PL 的团</h2>
-          </header>
-          {asPlSessions.length === 0 ? (
-            <p className="text-ink-100/50 text-sm">暂无</p>
-          ) : (
-            <ul className="space-y-2">
-              {asPlSessions.map((m) => (
-                <li key={m.id}>
-                  <Link href={`/sessions/${m.sessionId}`} className="block hover:bg-ink-800 rounded p-2 -mx-2">
-                    <div className="font-medium">{m.session.title}</div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {/* 2. 我参与的跑团（KP + PL 合并成一栏） */}
+      <section>
+        <SectionTitle title="我参与的跑团" />
+        {asKpSessions.length === 0 && asPlSessions.length === 0 ? (
+          <EmptyState text="暂时还没参加任何跑团。" />
+        ) : (
+          <ul className="card divide-y divide-sky-200 p-0">
+            {asKpSessions.map((s) => (
+              <li key={s.id}>
+                <Link href={`/sessions/${s.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-ink">{s.title}</div>
+                    <div className="text-xs text-ink-soft">我作为 KP</div>
+                  </div>
+                  <Tag>{sessionStatusLabel(s.status)}</Tag>
+                </Link>
+              </li>
+            ))}
+            {asPlSessions.map((m) => (
+              <li key={m.id}>
+                <Link href={`/sessions/${m.sessionId}`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-ink">{m.session.title}</div>
+                    <div className="text-xs text-ink-soft">我作为 PL</div>
+                  </div>
+                  <Tag>{sessionStatusLabel(m.session.status)}</Tag>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-        <section className="card md:col-span-2 lg:col-span-2">
-          <header className="flex items-center justify-between mb-3">
-            <h2 className="font-bold">我发布的招募</h2>
-            <Link href="/recruitments/new" className="text-sm text-brand-500">+ 发布</Link>
-          </header>
+      {/* 3. 我发布的招募 + 公开招募（左右两栏，避免再叠成三列拥挤） */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div>
+          <SectionTitle
+            title="我发布的招募"
+            link={{ href: '/recruitments/new', label: '＋ 发布' }}
+          />
           {myRecruitments.length === 0 ? (
-            <p className="text-ink-100/50 text-sm">暂无</p>
+            <EmptyState text="暂无。" />
           ) : (
-            <ul className="space-y-2">
+            <ul className="card divide-y divide-sky-200 p-0">
               {myRecruitments.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/recruitments/${r.id}/manage`} className="block hover:bg-ink-800 rounded p-2 -mx-2">
-                    <div className="font-medium">{r.title}</div>
-                    <div className="text-xs text-ink-100/50">{r.status} · {r.minPlayers}-{r.maxPlayers} 人</div>
+                  <Link href={`/recruitments/${r.id}/manage`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-ink">{r.title}</div>
+                      <div className="text-xs text-ink-soft">
+                        {r.minPlayers}-{r.maxPlayers} 人
+                      </div>
+                    </div>
+                    <Tag>{recruitmentStatusLabel(r.status)}</Tag>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </div>
 
-        <section className="card">
-          <h2 className="font-bold mb-3">公开招募（最新）</h2>
+        <div>
+          <SectionTitle
+            title="公开招募（最新）"
+            link={{ href: '/recruitments', label: '查看全部' }}
+          />
           {openRecruitments.length === 0 ? (
-            <p className="text-ink-100/50 text-sm">暂无</p>
+            <EmptyState text="暂无公开招募。" />
           ) : (
-            <ul className="space-y-2">
+            <ul className="card divide-y divide-sky-200 p-0">
               {openRecruitments.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/recruitments/${r.id}`} className="block hover:bg-ink-800 rounded p-2 -mx-2">
-                    <div className="font-medium text-sm">{r.title}</div>
-                    <div className="text-xs text-ink-100/50">KP: @{r.kp.username}</div>
+                  <Link href={`/recruitments/${r.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-sky-50">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-ink">{r.title}</div>
+                      <div className="text-xs text-ink-soft">KP @{r.kp.username}</div>
+                    </div>
+                    <Tag tone="ok">招募中</Tag>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-          <div className="mt-3 text-right">
-            <Link href="/recruitments" className="text-sm text-brand-500">查看全部 →</Link>
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
+  );
+}
+
+function sessionStatusLabel(s: string): string {
+  switch (s) {
+    case 'OPEN': return '进行中';
+    case 'CLOSED': return '已结团';
+    default: return s;
+  }
+}
+
+function recruitmentStatusLabel(s: string): string {
+  switch (s) {
+    case 'OPEN': return '招募中';
+    case 'CLOSED': return '已关闭';
+    default: return s;
+  }
+}
+
+/* —— 小元件 —— */
+
+function SectionTitle({ title, link }: { title: string; link?: { href: string; label: string } }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <h2 className="text-lg font-bold text-ink">{title}</h2>
+      {link && (
+        <Link href={link.href} className="text-sm font-semibold text-macaron-600 hover:underline">
+          {link.label}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ text, cta }: { text: string; cta?: { href: string; label: string } }) {
+  return (
+    <div className="card flex flex-col items-center gap-3 py-10 text-center">
+      <p className="text-sm text-ink-soft">{text}</p>
+      {cta && <Link href={cta.href} className="btn-primary text-sm">{cta.label}</Link>}
+    </div>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-sky-100 px-2 py-0.5 font-medium text-ink">{children}</span>
+  );
+}
+
+function Tag({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'ok' }) {
+  const cls =
+    tone === 'ok'
+      ? 'bg-ok/15 text-ok'
+      : 'bg-sky-100 text-ink-soft';
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{children}</span>
   );
 }

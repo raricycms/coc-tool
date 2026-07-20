@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { CharacterForm } from '@/components/CharacterForm';
@@ -10,10 +9,10 @@ export default async function NewCharacterPage() {
   if (!user) redirect('/login');
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-3xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">新建车卡</h1>
-        <Link href="/characters" className="btn-ghost text-sm">← 返回</Link>
+    <main className="mx-auto max-w-3xl px-4 py-10">
+      <header className="mb-8">
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">新建车卡</h1>
+        <p className="mt-1 text-sm text-ink-soft">分五步：基础 → 属性 → 技能 → 装备 → 背景。</p>
       </header>
       <CharacterForm />
     </main>

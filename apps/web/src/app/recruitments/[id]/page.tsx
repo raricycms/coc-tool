@@ -34,31 +34,35 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
   const isKp = r.kpId === user.id;
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-3xl mx-auto">
-      <header className="mb-6">
-        <Link href="/recruitments" className="btn-ghost text-sm mb-3 inline-block">← 返回列表</Link>
-        <h1 className="text-3xl font-bold mb-1">{r.title}</h1>
-        <p className="text-ink-100/60 text-sm">KP: @{r.kp.username}</p>
+    <main className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+      <header className="space-y-2">
+        <Link href="/recruitments" className="text-sm font-semibold text-macaron-600 hover:underline">
+          ← 返回招募列表
+        </Link>
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">{r.title}</h1>
+        <p className="text-sm text-ink-soft">KP @{r.kp.username}</p>
       </header>
 
-      <section className="card mb-4">
-        <p className="whitespace-pre-wrap text-sm">{r.summary}</p>
-        <div className="mt-4 flex gap-4 text-xs text-ink-100/50">
-          <span>已批准 PL {r.applications.length}/{r.maxPlayers}</span>
-          <span>最小 {r.minPlayers} 人</span>
-          {r.scenario && <span>剧本: {r.scenario}</span>}
-          {r.expectedHours && <span>{r.expectedHours}h</span>}
+      <section className="card space-y-4">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{r.summary}</p>
+        <div className="flex flex-wrap gap-2 text-[11px]">
+          <Tag>已通过 PL {r.applications.length}/{r.maxPlayers}</Tag>
+          <Tag>最少 {r.minPlayers} 人</Tag>
+          {r.scenario && <Tag>剧本：{r.scenario}</Tag>}
+          {r.expectedHours && <Tag>预计 {r.expectedHours} 小时</Tag>}
         </div>
       </section>
 
-      <section className="card mb-4">
-        <h2 className="font-bold mb-2">已报名 PL</h2>
+      <section className="card">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-soft">已通过 PL</h2>
         {r.applications.length === 0 ? (
-          <p className="text-ink-100/40 text-sm">还没有 PL 通过审核。</p>
+          <p className="text-sm text-ink-soft">还没有 PL 通过审核。</p>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="flex flex-wrap gap-2">
             {r.applications.map((a) => (
-              <li key={a.id}>@{a.applicant.username}</li>
+              <li key={a.id} className="rounded-full bg-sky-100 px-3 py-1 text-sm text-ink">
+                @{a.applicant.username}
+              </li>
             ))}
           </ul>
         )}
@@ -73,10 +77,18 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
       )}
 
       {isKp && (
-        <Link href={`/recruitments/${r.id}/manage`} className="btn-primary inline-block">
-          管理招募 →
-        </Link>
+        <div className="flex justify-end">
+          <Link href={`/recruitments/${r.id}/manage`} className="btn-primary">
+            管理招募 →
+          </Link>
+        </div>
       )}
     </main>
+  );
+}
+
+function Tag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-sky-100 px-2.5 py-1 font-medium text-ink">{children}</span>
   );
 }

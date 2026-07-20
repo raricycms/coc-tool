@@ -43,13 +43,6 @@ interface Props {
   onEquipmentDelete: (characterId: string, id: string) => void;
 }
 
-/**
- * 角色详情弹窗：所有人可见。
- *  - 所有人：看完整数值 + 技能 + 武器 + 物品
- *  - KP    ：额外获得武器 / 物品的「新增 / 编辑 / 删除」表单
- *
- * 设计：单 Modal，居中显示，背景遮罩，Esc 关闭。
- */
 export function CharacterDetailModal({
   character, ownerUsername, isKp,
   onClose,
@@ -59,24 +52,24 @@ export function CharacterDetailModal({
   if (!character) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-3xl my-8 max-h-[calc(100vh-4rem)] flex flex-col"
+        className="card my-8 flex w-full max-w-3xl flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between border-b border-white/10 -mx-5 -mt-5 px-5 py-3 mb-4">
+        <header className="-mx-5 -mt-5 mb-4 flex items-start justify-between border-b border-sky-200 px-5 py-3">
           <div>
-            <h2 className="font-bold text-lg">{character.name}</h2>
+            <h2 className="text-lg font-bold text-ink">{character.name}</h2>
             {ownerUsername && (
-              <div className="text-xs text-ink-100/40">@{ownerUsername}</div>
+              <div className="text-xs text-ink-muted">@{ownerUsername}</div>
             )}
           </div>
           <button className="btn-ghost text-xs" onClick={onClose}>关闭 ✕</button>
         </header>
 
-        <div className="overflow-y-auto pr-2 space-y-5 text-sm">
+        <div className="space-y-5 overflow-y-auto pr-2 text-sm">
           <DerivedStats char={character} />
           <PrimaryStats char={character} />
           <SkillsSection char={character} />
@@ -93,8 +86,8 @@ export function CharacterDetailModal({
             onDelete={onEquipmentDelete}
           />
           {!isKp && (
-            <p className="text-[10px] text-ink-100/30 italic text-center">
-              只读视图 · 武器/物品由 KP 管理
+            <p className="text-center text-[11px] italic text-ink-muted">
+              只读视图 · 武器和物品由 KP 管理
             </p>
           )}
         </div>
@@ -109,14 +102,14 @@ function DerivedStats({ char }: { char: CharacterDetail }) {
   const mpPct = char.mpMax > 0 ? Math.max(0, Math.min(100, (char.mp / char.mpMax) * 100)) : 0;
   return (
     <section>
-      <h3 className="font-bold text-ink-100/70 mb-1.5">状态</h3>
-      <div className="space-y-1.5">
-        <Bar label="HP" value={char.hp} max={char.hpMax} pct={hpPct} color="bg-red-500" />
-        <Bar label="SAN" value={char.san} max={char.sanMax} pct={sanPct} color="bg-violet-500" />
-        {char.mpMax > 0 && <Bar label="MP" value={char.mp} max={char.mpMax} pct={mpPct} color="bg-sky-500" />}
-        <div className="flex gap-2 text-xs text-ink-100/60 pt-1">
-          <span>🎲 LUCK <b className="text-ink-100">{char.luck}</b></span>
-          <span>🗡 DB <b className="text-ink-100">{char.damageBonus}</b></span>
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">状态</h3>
+      <div className="space-y-2">
+        <Bar label="HP" value={char.hp} max={char.hpMax} pct={hpPct} color="bg-bad" />
+        <Bar label="SAN" value={char.san} max={char.sanMax} pct={sanPct} color="bg-mythos" />
+        {char.mpMax > 0 && <Bar label="MP" value={char.mp} max={char.mpMax} pct={mpPct} color="bg-macaron-300" />}
+        <div className="flex gap-4 pt-1 text-xs text-ink-soft">
+          <span>LUCK <b className="text-ink">{char.luck}</b></span>
+          <span>伤害加值 <b className="text-ink">{char.damageBonus}</b></span>
         </div>
       </div>
     </section>
@@ -130,12 +123,12 @@ function PrimaryStats({ char }: { char: CharacterDetail }) {
   ];
   return (
     <section>
-      <h3 className="font-bold text-ink-100/70 mb-1.5">基础属性</h3>
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">基础属性</h3>
       <div className="grid grid-cols-9 gap-1.5">
         {cells.map(([label, val]) => (
-          <div key={label} className="rounded bg-white/[0.04] border border-white/5 py-1 text-center">
-            <div className="text-[10px] text-ink-100/40">{label}</div>
-            <div className="font-mono text-ink-100">{val}</div>
+          <div key={label} className="rounded-2xl border border-sky-200 bg-sky-50 py-1.5 text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">{label}</div>
+            <div className="font-mono text-sm font-bold text-ink">{val}</div>
           </div>
         ))}
       </div>
@@ -150,14 +143,14 @@ function SkillsSection({ char }: { char: CharacterDetail }) {
   if (sorted.length === 0) return null;
   return (
     <section>
-      <h3 className="font-bold text-ink-100/70 mb-1.5">技能（{sorted.length}）</h3>
-      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">技能 · {sorted.length}</h3>
+      <ul className="grid grid-cols-2 gap-x-4 text-xs">
         {sorted.map((s) => (
-          <li key={s.name} className="flex justify-between border-b border-white/[0.04] py-0.5">
-            <span className={s.isMythos ? 'text-violet-300' : 'text-ink-100/80'}>
+          <li key={s.name} className="flex justify-between border-b border-sky-100 py-0.5">
+            <span className={s.isMythos ? 'text-mythos font-semibold' : 'text-ink'}>
               {s.name}{s.isMythos && ' ✦'}
             </span>
-            <span className="font-mono text-ink-100/70">{s.value}</span>
+            <span className="font-mono text-ink-soft">{s.value}</span>
           </li>
         ))}
       </ul>
@@ -173,14 +166,14 @@ function WeaponsSection({ character, isKp, onUpsert, onDelete }: {
 }) {
   return (
     <section>
-      <h3 className="font-bold text-ink-100/70 mb-1.5 flex items-center justify-between">
-        <span>武器（{character.weapons.length}）</span>
+      <header className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">武器 · {character.weapons.length}</h3>
         {isKp && <NewWeaponButton character={character} onUpsert={onUpsert} />}
-      </h3>
+      </header>
       {character.weapons.length === 0 ? (
-        <p className="text-xs text-ink-100/30">{isKp ? '还没有武器，点上方「+ 武器」新增。' : '没有武器。'}</p>
+        <p className="text-xs text-ink-muted">{isKp ? '还没有武器，点右上方「+ 武器」新增。' : '没有武器。'}</p>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {character.weapons.map((w) => (
             <li key={w.id}>
               <WeaponRow weapon={w} character={character} isKp={isKp} onUpsert={onUpsert} onDelete={onDelete} />
@@ -199,8 +192,8 @@ function NewWeaponButton({ character, onUpsert }: {
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <button className="btn-ghost text-[10px] px-2 py-0.5" onClick={() => setOpen((v) => !v)}>
-        {open ? '收起' : '+ 武器'}
+      <button className="btn-soft text-xs" onClick={() => setOpen((v) => !v)}>
+        {open ? '收起' : '＋ 武器'}
       </button>
       {open && (
         <div className="mt-2">
@@ -227,27 +220,27 @@ function WeaponRow({ weapon, character, isKp, onUpsert, onDelete }: {
 }) {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="rounded bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+    <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2">
       {!editing ? (
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-2">
           <div className="text-xs">
-            <b className="text-ink-100">{weapon.name}</b>
-            <span className="text-ink-100/50 ml-1.5">
+            <b className="text-ink">{weapon.name}</b>
+            <span className="ml-1.5 text-ink-soft">
               · {weapon.skill} · {weapon.damage}
               {weapon.range && ` · 射程 ${weapon.range}`}
               {weapon.ammo != null && ` · 弹药 ${weapon.ammo}`}
             </span>
-            {weapon.note && <span className="block text-[10px] text-ink-100/40 italic mt-0.5">{weapon.note}</span>}
+            {weapon.note && <span className="mt-0.5 block text-[10px] italic text-ink-muted">{weapon.note}</span>}
           </div>
           {isKp && (
-            <div className="flex gap-1 shrink-0">
-              <button className="btn-ghost text-[10px] px-1.5 py-0" onClick={() => setEditing(true)}>✎</button>
+            <div className="flex shrink-0 gap-1">
+              <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => setEditing(true)}>编辑</button>
               <button
-                className="btn-danger text-[10px] px-1.5 py-0"
+                className="btn-danger px-2 py-0.5 text-[11px]"
                 onClick={() => {
                   if (confirm(`删除武器「${weapon.name}」？`)) onDelete(character.id, weapon.id);
                 }}
-              >✕</button>
+              >删除</button>
             </div>
           )}
         </div>
@@ -301,7 +294,7 @@ function WeaponForm({ mode, characterId, initial, onSubmit, onCancel }: {
 
   const submit = () => {
     if (!name.trim() || !skill.trim() || !damage.trim()) {
-      alert('名称 / 技能 / 伤害 是必填项');
+      alert('名称 / 使用技能 / 伤害 是必填项');
       return;
     }
     onSubmit({
@@ -316,30 +309,38 @@ function WeaponForm({ mode, characterId, initial, onSubmit, onCancel }: {
   };
 
   return (
-    <div className="subpanel space-y-1.5 text-xs">
-      <div className="grid grid-cols-2 gap-1.5">
-        <input className="input text-xs" placeholder="名称 *" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
-        <input className="input text-xs" placeholder="对应技能 *" value={skill} onChange={(e) => setSkill(e.target.value)} maxLength={40} />
-        <input className="input text-xs font-mono" placeholder="伤害表达式（如 1d6）*" value={damage} onChange={(e) => setDamage(e.target.value)} maxLength={20} />
-        <input className="input text-xs" placeholder="射程（可选）" value={range} onChange={(e) => setRange(e.target.value)} maxLength={20} />
+    <div className="subpanel space-y-2 text-xs">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="label text-xs">名称 <span className="text-bad">*</span></label>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
+        </div>
+        <div>
+          <label className="label text-xs">使用技能 <span className="text-bad">*</span></label>
+          <input className="input" value={skill} onChange={(e) => setSkill(e.target.value)} maxLength={40} />
+        </div>
+        <div>
+          <label className="label text-xs">伤害表达式 <span className="text-bad">*</span></label>
+          <input className="input font-mono" placeholder="1d6" value={damage} onChange={(e) => setDamage(e.target.value)} maxLength={20} />
+        </div>
+        <div>
+          <label className="label text-xs">射程（可选）</label>
+          <input className="input" value={range} onChange={(e) => setRange(e.target.value)} maxLength={20} />
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
-        <input
-          type="number"
-          className="input text-xs"
-          placeholder="弹药数（可选）"
-          value={ammo}
-          onChange={(e) => setAmmo(e.target.value)}
-          min={0}
-          max={9999}
-        />
-        <input className="input text-xs" placeholder="备注（可选）" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="label text-xs">弹药数（可选）</label>
+          <input type="number" className="input" value={ammo} onChange={(e) => setAmmo(e.target.value)} min={0} max={9999} />
+        </div>
+        <div>
+          <label className="label text-xs">备注（可选）</label>
+          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
+        </div>
       </div>
-      <div className="flex justify-end gap-1.5 pt-1">
-        <button className="btn-ghost text-[10px] px-2 py-0.5" onClick={onCancel}>取消</button>
-        <button className="btn-primary text-[10px] px-2 py-0.5" onClick={submit}>
-          {mode === 'create' ? '新增' : '保存'}
-        </button>
+      <div className="flex justify-end gap-2 pt-1">
+        <button className="btn-ghost text-xs" onClick={onCancel}>取消</button>
+        <button className="btn-primary text-xs" onClick={submit}>{mode === 'create' ? '新增' : '保存'}</button>
       </div>
     </div>
   );
@@ -353,14 +354,14 @@ function EquipmentSection({ character, isKp, onUpsert, onDelete }: {
 }) {
   return (
     <section>
-      <h3 className="font-bold text-ink-100/70 mb-1.5 flex items-center justify-between">
-        <span>物品（{character.equipment.length}）</span>
+      <header className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">物品 · {character.equipment.length}</h3>
         {isKp && <NewEquipmentButton character={character} onUpsert={onUpsert} />}
-      </h3>
+      </header>
       {character.equipment.length === 0 ? (
-        <p className="text-xs text-ink-100/30">{isKp ? '还没有物品，点上方「+ 物品」新增。' : '没有物品。'}</p>
+        <p className="text-xs text-ink-muted">{isKp ? '还没有物品，点右上方「+ 物品」新增。' : '没有物品。'}</p>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {character.equipment.map((e) => (
             <li key={e.id}>
               <EquipmentRow equipment={e} character={character} isKp={isKp} onUpsert={onUpsert} onDelete={onDelete} />
@@ -379,8 +380,8 @@ function NewEquipmentButton({ character, onUpsert }: {
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <button className="btn-ghost text-[10px] px-2 py-0.5" onClick={() => setOpen((v) => !v)}>
-        {open ? '收起' : '+ 物品'}
+      <button className="btn-soft text-xs" onClick={() => setOpen((v) => !v)}>
+        {open ? '收起' : '＋ 物品'}
       </button>
       {open && (
         <div className="mt-2">
@@ -407,23 +408,23 @@ function EquipmentRow({ equipment, character, isKp, onUpsert, onDelete }: {
 }) {
   const [editing, setEditing] = useState(false);
   return (
-    <div className="rounded bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+    <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2">
       {!editing ? (
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-2">
           <div className="text-xs">
-            <b className="text-ink-100">{equipment.name}</b>
-            <span className="text-ink-100/50 ml-1.5">· ×{equipment.quantity}</span>
-            {equipment.note && <span className="block text-[10px] text-ink-100/40 italic mt-0.5">{equipment.note}</span>}
+            <b className="text-ink">{equipment.name}</b>
+            <span className="ml-1.5 text-ink-soft">× {equipment.quantity}</span>
+            {equipment.note && <span className="mt-0.5 block text-[10px] italic text-ink-muted">{equipment.note}</span>}
           </div>
           {isKp && (
-            <div className="flex gap-1 shrink-0">
-              <button className="btn-ghost text-[10px] px-1.5 py-0" onClick={() => setEditing(true)}>✎</button>
+            <div className="flex shrink-0 gap-1">
+              <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => setEditing(true)}>编辑</button>
               <button
-                className="btn-danger text-[10px] px-1.5 py-0"
+                className="btn-danger px-2 py-0.5 text-[11px]"
                 onClick={() => {
                   if (confirm(`删除物品「${equipment.name}」？`)) onDelete(character.id, equipment.id);
                 }}
-              >✕</button>
+              >删除</button>
             </div>
           )}
         </div>
@@ -474,40 +475,37 @@ function EquipmentForm({ mode, characterId, initial, onSubmit, onCancel }: {
   };
 
   return (
-    <div className="subpanel space-y-1.5 text-xs">
-      <div className="grid grid-cols-[1fr_6rem] gap-1.5">
-        <input className="input text-xs" placeholder="名称 *" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-        <input
-          type="number"
-          className="input text-xs"
-          placeholder="数量"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          min={1}
-          max={9999}
-        />
+    <div className="subpanel space-y-2 text-xs">
+      <div className="grid gap-2 sm:grid-cols-[1fr_6rem]">
+        <div>
+          <label className="label text-xs">名称 <span className="text-bad">*</span></label>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+        </div>
+        <div>
+          <label className="label text-xs">数量</label>
+          <input type="number" className="input" value={quantity} onChange={(e) => setQuantity(e.target.value)} min={1} max={9999} />
+        </div>
       </div>
-      <input className="input text-xs" placeholder="备注（可选）" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
-      <div className="flex justify-end gap-1.5 pt-1">
-        <button className="btn-ghost text-[10px] px-2 py-0.5" onClick={onCancel}>取消</button>
-        <button className="btn-primary text-[10px] px-2 py-0.5" onClick={submit}>
-          {mode === 'create' ? '新增' : '保存'}
-        </button>
+      <div>
+        <label className="label text-xs">备注（可选）</label>
+        <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button className="btn-ghost text-xs" onClick={onCancel}>取消</button>
+        <button className="btn-primary text-xs" onClick={submit}>{mode === 'create' ? '新增' : '保存'}</button>
       </div>
     </div>
   );
 }
 
-// ─────────────── shared bits ───────────────
-
 function Bar({ label, value, max, pct, color }: { label: string; value: number; max: number; pct: number; color: string }) {
   return (
     <div>
-      <div className="flex items-center justify-between text-xs mb-0.5">
-        <span className="text-ink-100/60 font-medium">{label}</span>
-        <span className="font-mono text-ink-100/90"><b>{value}</b><span className="text-ink-100/40">/{max}</span></span>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="font-semibold text-ink-soft">{label}</span>
+        <span className="font-mono text-ink"><b>{value}</b><span className="text-ink-muted">/{max}</span></span>
       </div>
-      <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+      <div className="h-2 overflow-hidden rounded-full bg-sky-100">
         <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>

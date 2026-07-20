@@ -31,24 +31,31 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   });
   if (!session) notFound();
 
-  // 判断角色
   const member = session.members.find((m) => m.userId === user.id);
   const role = member?.role ?? 'SPECTATOR';
   const isKp = role === 'KP';
 
   return (
-    <main className="min-h-screen flex flex-col">
-      <header className="px-4 py-3 border-b border-ink-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-ink-100/60 hover:text-ink-100 text-sm">← 返回</Link>
-          <h1 className="font-bold">{session.title}</h1>
-          <span className="text-xs text-ink-100/40">[{role}]</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="font-mono">⏰ {session.inGameDate} {session.inGameTime}</span>
-          {isKp && (
-            <Link href={`/sessions/${session.id}/settlement`} className="btn-ghost text-xs">→ 结算</Link>
-          )}
+    <main className="flex min-h-screen flex-col">
+      <header className="border-b border-sky-200 bg-white px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="text-sm font-semibold text-macaron-600 hover:underline">
+              ← 概览
+            </Link>
+            <h1 className="truncate text-lg font-bold text-ink">{session.title}</h1>
+            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-ink-soft">
+              {role === 'KP' ? '主持人' : role === 'PL' ? '玩家' : '旁观'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-ink-soft">
+            <span className="font-mono">⏰ {session.inGameDate} {session.inGameTime}</span>
+            {isKp && (
+              <Link href={`/sessions/${session.id}/settlement`} className="btn-soft text-xs">
+                → 结算
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -67,7 +74,6 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           username: m.user.username,
           avatar: m.user.avatarUrl,
           role: m.role as 'KP' | 'PL' | 'SPECTATOR',
-          // SSR 无法判断谁真正连着 socket：统一标离线，等客户端连上后再被 PRESENCE_UPDATE 覆盖。
           online: false,
           characterId: m.characterId ?? undefined,
           character: m.character ? {

@@ -20,68 +20,56 @@ export function ClockPanel({ clock, role, onControl }: Props) {
   };
 
   return (
-    <div className="card">
-      <h3 className="font-bold mb-2 text-ink-100/80">⏰ 时钟</h3>
-      <div className="text-center mb-3">
-        <div className="text-3xl font-mono">{clock.inGameTime}</div>
-        <div className="text-xs text-ink-100/40">{clock.inGameDate} · {clock.running ? `▶ ${clock.rate}x` : '⏸ 暂停'}</div>
+    <section className="card">
+      <header className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">⏰ 游戏内时钟</h3>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${clock.running ? 'bg-ok/15 text-ok' : 'bg-sky-100 text-ink-soft'}`}>
+          {clock.running ? `▶ ${clock.rate}× 加速` : '⏸ 暂停'}
+        </span>
+      </header>
+      <div className="text-center">
+        <div className="font-mono text-3xl font-bold text-ink">{clock.inGameTime}</div>
+        <div className="mt-1 text-xs text-ink-muted">{clock.inGameDate}</div>
       </div>
       {isKp && (
-        <div className="space-y-2">
-          <div className="flex gap-1">
-            {!clock.running ? (
-              <button className="btn-primary text-xs flex-1" onClick={() => onControl({ action: 'start' })}>▶ 开始</button>
-            ) : (
-              <button className="btn-ghost text-xs flex-1" onClick={() => onControl({ action: 'pause' })}>⏸ 暂停</button>
-            )}
-          </div>
+        <div className="mt-4 space-y-3">
+          <button
+            className={clock.running ? 'btn-ghost w-full text-sm' : 'btn-primary w-full text-sm'}
+            onClick={() => onControl({ action: clock.running ? 'pause' : 'start' })}
+          >
+            {clock.running ? '⏸ 暂停' : '▶ 开始'}
+          </button>
 
-          {/* 自定义倍率：step 按钮 ±0.1 / ±1 + 自由输入 */}
+          {/* 倍率：每个控件自带 label 和输入框，不再让 label 与控件错位 */}
           <div>
             <label className="label text-xs flex items-center justify-between">
-              <span>倍率</span>
-              <span className="text-[10px] text-ink-100/40">{MIN_RATE}–{MAX_RATE}</span>
+              <span>时间倍率</span>
+              <span className="text-[10px] text-ink-muted">{MIN_RATE}–{MAX_RATE}×</span>
             </label>
-            <div className="flex items-center gap-1">
-              <button
-                className="btn-ghost text-xs px-2"
-                onClick={() => setRateSafe(clock.rate - 1)}
-                title="倍率 -1"
-              >−1</button>
-              <button
-                className="btn-ghost text-xs px-2"
-                onClick={() => setRateSafe(clock.rate - 0.1)}
-                title="倍率 -0.1"
-              >−0.1</button>
+            <div className="flex items-center gap-1.5">
+              <button className="btn-ghost px-3 text-xs" onClick={() => setRateSafe(clock.rate - 1)} title="倍率 -1">−1</button>
+              <button className="btn-ghost px-3 text-xs" onClick={() => setRateSafe(clock.rate - 0.1)} title="倍率 -0.1">−0.1</button>
               <input
                 type="number"
-                className="input text-sm font-mono text-center flex-1"
+                className="input text-center font-mono"
                 min={MIN_RATE}
                 max={MAX_RATE}
                 step={0.1}
                 value={clock.rate}
                 onChange={(e) => setRateSafe(parseFloat(e.target.value))}
               />
-              <button
-                className="btn-ghost text-xs px-2"
-                onClick={() => setRateSafe(clock.rate + 0.1)}
-                title="倍率 +0.1"
-              >+0.1</button>
-              <button
-                className="btn-ghost text-xs px-2"
-                onClick={() => setRateSafe(clock.rate + 1)}
-                title="倍率 +1"
-              >+1</button>
+              <button className="btn-ghost px-3 text-xs" onClick={() => setRateSafe(clock.rate + 0.1)} title="倍率 +0.1">+0.1</button>
+              <button className="btn-ghost px-3 text-xs" onClick={() => setRateSafe(clock.rate + 1)} title="倍率 +1">+1</button>
             </div>
           </div>
 
-          <div className="flex gap-1">
-            <button className="btn-ghost text-xs flex-1" onClick={() => onControl({ action: 'addTime', deltaMinutes: 15 })}>+15m</button>
-            <button className="btn-ghost text-xs flex-1" onClick={() => onControl({ action: 'addTime', deltaMinutes: 60 })}>+1h</button>
-            <button className="btn-ghost text-xs flex-1" onClick={() => onControl({ action: 'addTime', deltaMinutes: -15 })}>-15m</button>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button className="btn-ghost text-xs" onClick={() => onControl({ action: 'addTime', deltaMinutes: 15 })}>+15 分钟</button>
+            <button className="btn-ghost text-xs" onClick={() => onControl({ action: 'addTime', deltaMinutes: 60 })}>+1 小时</button>
+            <button className="btn-ghost text-xs" onClick={() => onControl({ action: 'addTime', deltaMinutes: -15 })}>−15 分钟</button>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

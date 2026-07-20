@@ -28,9 +28,9 @@ export function CaptchaBox({ onChange }: { onChange: (data: { token: string; ans
   }, [data, answer, onChange]);
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 flex items-center justify-center rounded-md border border-ink-800 bg-ink-900 px-3 py-2 font-mono text-lg select-none">
-        {data?.text ?? '加载中...'}
+    <div className="flex items-stretch gap-2">
+      <div className="flex flex-1 items-center justify-center rounded-2xl border border-sky-300 bg-sky-50 px-3 py-2 font-mono text-lg tracking-wider text-ink select-none">
+        {data?.text ?? '加载中…'}
       </div>
       <input
         type="text"
@@ -40,7 +40,7 @@ export function CaptchaBox({ onChange }: { onChange: (data: { token: string; ans
         onChange={(e) => setAnswer(e.target.value)}
         autoComplete="off"
       />
-      <button type="button" onClick={refresh} className="btn-ghost text-sm" title="换一题">
+      <button type="button" onClick={refresh} className="btn-ghost px-3" title="换一题" aria-label="换一题">
         ↻
       </button>
     </div>

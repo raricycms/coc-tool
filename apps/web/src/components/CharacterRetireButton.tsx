@@ -15,24 +15,28 @@ export function CharacterRetireButton({ characterId }: { characterId: string }) 
     if (res.ok) {
       router.refresh();
     } else {
-      alert('撕卡失败');
+      alert('操作失败');
     }
   };
 
   if (!confirming) {
     return (
-      <div className="mt-6">
-        <button className="btn-danger" onClick={() => setConfirming(true)}>撕卡 / 送疯人院</button>
+      <div className="flex justify-end">
+        <button className="btn-danger" onClick={() => setConfirming(true)}>
+          退役这张车卡
+        </button>
       </div>
     );
   }
   return (
-    <div className="mt-6 card border-red-500">
-      <p className="mb-3">确认撕卡？此操作将软删除车卡（仍在列表显示，但不可加入新 Session）。</p>
-      <div className="flex gap-2">
+    <div className="card border-bad/40 bg-bad/5">
+      <p className="text-sm text-ink">
+        确定要退役这张车卡吗？退役后会保留在列表中，但不能再加入新的跑团。
+      </p>
+      <div className="mt-3 flex justify-end gap-2">
         <button className="btn-ghost" onClick={() => setConfirming(false)}>取消</button>
         <button className="btn-danger" onClick={retire} disabled={loading}>
-          {loading ? '处理中...' : '确认撕卡'}
+          {loading ? '处理中…' : '确认退役'}
         </button>
       </div>
     </div>

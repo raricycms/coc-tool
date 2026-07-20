@@ -9,7 +9,7 @@ export function StartSessionButton({ recruitmentId, approvedCount }: { recruitme
   const [error, setError] = useState<string | null>(null);
 
   const start = async () => {
-    if (!confirm('启动团？启动后将创建 Session 并关闭招募。')) return;
+    if (!confirm('确定开团？开团后这场招募会关闭，所有已通过的 PL 自动入团。')) return;
     setLoading(true);
     setError(null);
     const res = await fetch(`/api/recruitments/${recruitmentId}/start`, { method: 'POST' });
@@ -23,15 +23,19 @@ export function StartSessionButton({ recruitmentId, approvedCount }: { recruitme
   };
 
   if (approvedCount === 0) {
-    return <p className="text-sm text-ink-100/40">至少需要 1 名通过审核的 PL 才能启动团。</p>;
+    return (
+      <div className="card text-center text-sm text-ink-soft">
+        至少需要 1 名通过审核的 PL 才能开团。
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="flex flex-col items-end gap-2">
       <button className="btn-primary" onClick={start} disabled={loading}>
-        {loading ? '启动中...' : '启动团'}
+        {loading ? '启动中…' : '🚀 开团'}
       </button>
-      {error && <p className="error-text mt-2">{error}</p>}
+      {error && <p className="error-text">{error}</p>}
     </div>
   );
 }

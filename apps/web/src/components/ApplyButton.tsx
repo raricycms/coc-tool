@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useFieldErrors } from '@/lib/useFieldErrors';
 import { FieldError } from './FieldError';
 
@@ -10,6 +11,12 @@ interface Props {
   myCharacters: Array<{ id: string; name: string; era: string }>;
   existing: { status: string; characterId: string } | null;
 }
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: '待审核',
+  APPROVED: '已通过',
+  REJECTED: '已拒绝',
+};
 
 export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
   const router = useRouter();
@@ -22,7 +29,10 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
 
   if (myCharacters.length === 0) {
     return (
-      <div className="card text-ink-100/60 text-sm">你需要先创建至少一张车卡才能报名。<br /><a href="/characters/new" className="text-brand-500">立即创建 →</a></div>
+      <div className="card text-center">
+        <p className="text-sm text-ink">报名前需要至少一张可用的车卡。</p>
+        <Link href="/characters/new" className="btn-primary mt-3 inline-flex">立即创建车卡 →</Link>
+      </div>
     );
   }
 
@@ -51,20 +61,28 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
 
   if (existing) {
     return (
-      <div className="card">
-        <p>已报名（状态：{existing.status}）</p>
+      <div className="card flex items-center justify-between">
+        <p className="text-sm text-ink">你已经报名了这场招募</p>
+        <span className="rounded-full bg-macaron-100 px-3 py-1 text-xs font-semibold text-macaron-600">
+          {STATUS_LABEL[existing.status] ?? existing.status}
+        </span>
       </div>
     );
   }
 
   if (!open) {
-    return <button className="btn-primary" onClick={() => setOpen(true)}>报名</button>;
+    return (
+      <div className="flex justify-end">
+        <button className="btn-primary" onClick={() => setOpen(true)}>报名这场招募</button>
+      </div>
+    );
   }
 
   return (
-    <div className="card space-y-3">
+    <div className="card space-y-4">
+      <h2 className="text-lg font-bold text-ink">报名这场招募</h2>
       <FieldError error={get('characterId')}>
-        <label className="label">选择车卡</label>
+        <label className="label">使用哪张车卡</label>
         <select className="input" value={characterId} onChange={(e) => { setCharacterId(e.target.value); clear('characterId'); }}>
           {myCharacters.map((c) => (
             <option key={c.id} value={c.id}>{c.name} ({c.era})</option>
@@ -72,14 +90,14 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
         </select>
       </FieldError>
       <FieldError error={get('message')}>
-        <label className="label">留言（可选）</label>
+        <label className="label">给 KP 的留言（可选）</label>
         <textarea className="input" value={message} onChange={(e) => { setMessage(e.target.value); clear('message'); }} maxLength={2000} />
       </FieldError>
       {error && <p className="error-text">{error}</p>}
-      <div className="flex gap-2 justify-end">
+      <div className="flex justify-end gap-2">
         <button className="btn-ghost" onClick={() => setOpen(false)}>取消</button>
         <button className="btn-primary" onClick={submit} disabled={loading || !characterId}>
-          {loading ? '提交中...' : '提交报名'}
+          {loading ? '提交中…' : '提交报名'}
         </button>
       </div>
     </div>

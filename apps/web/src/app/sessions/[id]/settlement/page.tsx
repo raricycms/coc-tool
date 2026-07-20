@@ -17,9 +17,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
       members: {
         where: { leftAt: null },
         include: {
-          character: {
-            include: { skills: true },
-          },
+          character: { include: { skills: true } },
           user: { select: { username: true } },
         },
       },
@@ -50,15 +48,17 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
     }));
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-3xl mx-auto">
-      <header className="mb-6">
-        <Link href={`/sessions/${s.id}`} className="btn-ghost text-sm mb-3 inline-block">← 返回跑团</Link>
-        <h1 className="text-2xl font-bold">跑团结算 · {s.title}</h1>
-        <p className="text-sm text-ink-100/60">状态：{s.status}</p>
+    <main className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+      <header className="space-y-2">
+        <Link href={`/sessions/${s.id}`} className="text-sm font-semibold text-macaron-600 hover:underline">
+          ← 返回跑团
+        </Link>
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">跑团结算</h1>
+        <p className="text-sm text-ink-soft">{s.title}</p>
       </header>
 
       {!isKp ? (
-        <p className="text-ink-100/60">仅 KP 可进入结算流程。</p>
+        <p className="text-ink-soft">只有 KP 可以进入结算流程。</p>
       ) : (
         <SettlementWizard
           sessionId={s.id}

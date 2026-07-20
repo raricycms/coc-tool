@@ -16,16 +16,16 @@ export function ApplicationReviewButtons({ recruitmentId, appId }: { recruitment
     });
     setLoading(null);
     if (res.ok) router.refresh();
-    else alert('审核失败');
+    else alert('操作失败，请重试');
   };
 
   return (
-    <div className="flex gap-2">
-      <button className="btn-primary text-sm" onClick={() => review('approve')} disabled={!!loading}>
-        {loading === 'approve' ? '处理中...' : '通过'}
+    <div className="flex shrink-0 gap-2">
+      <button className="btn-soft text-sm" onClick={() => review('approve')} disabled={!!loading}>
+        {loading === 'approve' ? '处理中…' : '通过'}
       </button>
       <button className="btn-danger text-sm" onClick={() => review('reject')} disabled={!!loading}>
-        {loading === 'reject' ? '处理中...' : '拒绝'}
+        {loading === 'reject' ? '处理中…' : '拒绝'}
       </button>
     </div>
   );

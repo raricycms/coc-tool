@@ -27,34 +27,37 @@ export function OOCPanel({ messages, onSend, canSend, currentUsername }: Props) 
   };
 
   return (
-    <div className="card flex-1 flex flex-col min-h-0">
-      <h3 className="font-bold mb-2 text-ink-100/80">画外 (OOC)</h3>
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto space-y-2 text-sm min-h-0">
+    <div className="card flex min-h-0 flex-1 flex-col">
+      <header className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画外 · OOC</h3>
+        <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
+      </header>
+      <div ref={scrollerRef} className="flex-1 space-y-2 overflow-y-auto text-sm min-h-0">
         {messages.length === 0 ? (
-          <p className="text-ink-100/30 text-center py-8">还没有消息</p>
+          <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (
           messages.map((m) => (
-            <div key={m.id} className="border-l-2 border-ink-800 pl-2">
-              <div className="text-xs text-ink-100/40">
-                <span className={m.authorUsername === currentUsername ? 'text-brand-500' : ''}>
+            <div key={m.id} className="border-l-2 border-sky-200 pl-2.5">
+              <div className="text-[11px] text-ink-soft">
+                <span className={m.authorUsername === currentUsername ? 'font-semibold text-macaron-600' : ''}>
                   @{m.authorUsername}
                 </span>
                 {' · '}
                 {new Date(m.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
               </div>
-              <div className="whitespace-pre-wrap">{m.content}</div>
+              <div className="whitespace-pre-wrap text-ink">{m.content}</div>
             </div>
           ))
         )}
       </div>
       {canSend && (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <input
             className="input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
-            placeholder="画外消息..."
+            placeholder="说点什么（OOC）..."
             maxLength={2000}
           />
           <button className="btn-primary" onClick={send}>发送</button>

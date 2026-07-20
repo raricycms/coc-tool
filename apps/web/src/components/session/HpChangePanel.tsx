@@ -20,7 +20,7 @@ export function HpChangePanel({ characters, onChange, onDice }: Props) {
 
   const submitManual = () => {
     if (!targetId || delta === 0 || !reason.trim()) {
-      alert('需要填写 delta 和 reason');
+      alert('需要填写变动值和原因');
       return;
     }
     onChange(targetId, delta, reason.trim());
@@ -38,55 +38,48 @@ export function HpChangePanel({ characters, onChange, onDice }: Props) {
   };
 
   return (
-    <div className="card space-y-2">
-      <h3 className="font-bold text-sm">❤️ 修改 HP</h3>
-      <select className="input text-sm" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-        {characters.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.hp}/{c.hpMax})</option>)}
-      </select>
+    <section className="card space-y-4">
+      <header>
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">❤️ 修改 HP</h3>
+      </header>
 
-      {/* 手动扣/加血 */}
-      <div className="subpanel space-y-1">
-        <div className="text-xs text-ink-100/60">手动</div>
-        <input
-          type="number"
-          className="input text-sm"
-          value={delta}
-          onChange={(e) => setDelta(parseInt(e.target.value) || 0)}
-          placeholder="变动（负数扣血）"
-        />
-        <input
-          className="input text-sm"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="原因"
-          maxLength={200}
-        />
-        <button className="btn-ghost text-sm w-full" onClick={submitManual}>应用</button>
+      <div>
+        <label className="label">目标角色</label>
+        <select className="input" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+          {characters.map((c) => <option key={c.id} value={c.id}>{c.name}（{c.hp}/{c.hpMax}）</option>)}
+        </select>
       </div>
 
-      {/* 1dN 扣血骰 */}
-      <div className="subpanel space-y-1">
-        <div className="text-xs text-ink-100/60">骰子扣血（1dN）</div>
-        <div className="flex gap-1">
-          <input
-            className="input text-sm font-mono flex-1"
-            value={diceExpr}
-            onChange={(e) => setDiceExpr(e.target.value.trim())}
-            placeholder="1d6"
-          />
+      <div className="subpanel space-y-3">
+        <p className="text-xs font-semibold text-ink-soft">手动</p>
+        <div>
+          <label className="label text-xs">变动值（负数扣血）</label>
+          <input type="number" className="input" value={delta} onChange={(e) => setDelta(parseInt(e.target.value) || 0)} />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div>
+          <label className="label text-xs">原因</label>
+          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="被飞刀划伤 / 治疗法术…" />
+        </div>
+        <button className="btn-ghost w-full text-sm" onClick={submitManual}>应用</button>
+      </div>
+
+      <div className="subpanel space-y-3">
+        <p className="text-xs font-semibold text-ink-soft">骰子扣血</p>
+        <div>
+          <label className="label text-xs">骰子表达式</label>
+          <input className="input font-mono" value={diceExpr} onChange={(e) => setDiceExpr(e.target.value.trim())} placeholder="1d6" />
+        </div>
+        <div className="flex flex-wrap gap-1">
           {DICE_PRESETS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className="btn-ghost text-[10px] px-2 py-0.5 font-mono"
-              onClick={() => setDiceExpr(p)}
-            >{p}</button>
+            <button key={p} type="button" className="btn-ghost px-2 py-0.5 font-mono text-[11px]" onClick={() => setDiceExpr(p)}>{p}</button>
           ))}
         </div>
-        <button className="btn-primary text-sm w-full" onClick={submitDice}>🎲 掷骰扣血</button>
+        <div>
+          <label className="label text-xs">原因</label>
+          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
+        </div>
+        <button className="btn-primary w-full text-sm" onClick={submitDice}>🎲 掷骰扣血</button>
       </div>
-    </div>
+    </section>
   );
 }

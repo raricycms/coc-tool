@@ -63,11 +63,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
   const me = members.find((m) => m.userId === currentUserId);
 
-  // 让 WS 回调能读到最新的 members（用于历史回放时按 authorId 查用户名）
   const membersRef = useRef<Member[]>(members);
   useEffect(() => { membersRef.current = members; }, [members]);
 
-  // 连接 WS
   useEffect(() => {
     let cancelled = false;
     let socket: Awaited<ReturnType<typeof getSocket>> | null = null;
@@ -87,15 +85,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setConnected(true);
         setConnectError(null);
         s.emit(SOCKET_EVENTS.JOIN_SESSION, { sessionId });
-        // 拉两类历史：聊天类填 OOC/IC 面板；非聊天类填日志面板
-        s.emit(SOCKET_EVENTS.LOG_HISTORY, {
-          sessionId,
-          types: Array.from(CHAT_LOG_TYPES),
-        });
-        s.emit(SOCKET_EVENTS.LOG_HISTORY, {
-          sessionId,
-          types: NON_CHAT_LOG_TYPES as unknown as string[],
-        });
+        s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId, types: Array.from(CHAT_LOG_TYPES) });
+        s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId, types: NON_CHAT_LOG_TYPES as unknown as string[] });
       };
       onDisconnect = (reason: string) => {
         setConnected(false);
@@ -112,23 +103,16 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       s.on('connect_error', onConnectError);
       if (s.connected) onConnect();
 
-      s.on(SOCKET_EVENTS.OOC_MESSAGE, (m: OOCMessage) => {
-        setOocMessages((prev) => [...prev, m]);
-      });
-      s.on(SOCKET_EVENTS.IC_MESSAGE, (m: ICMessage) => {
-        setIcMessages((prev) => [...prev, m]);
-      });
+      s.on(SOCKET_EVENTS.OOC_MESSAGE, (m: OOCMessage) => setOocMessages((prev) => [...prev, m]));
+      s.on(SOCKET_EVENTS.IC_MESSAGE, (m: ICMessage) => setIcMessages((prev) => [...prev, m]));
 
-      // 聊天类 LOG_ENTRY 单独拆出去；非聊天类才进 logs。
-      // 注：聊天面板本身已经由 OOC_MESSAGE/IC_MESSAGE 实时更新；
-      // 这里是为了让历史回放时补齐缺失。
       s.on(SOCKET_EVENTS.LOG_ENTRY, (e: LogEntryPayload) => {
         if (isChatLog(e.type)) {
           if (e.type === 'CHAT_OOC') {
             const ooc: OOCMessage = {
               id: e.id, sessionId,
               authorId: e.authorId ?? '',
-              authorUsername: '', // 实时事件已带 authorUsername，此处不影响
+              authorUsername: '',
               authorAvatar: null,
               content: String((e.payload as any)?.content ?? ''),
               realTime: e.realTime,
@@ -153,7 +137,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setLogs((prev) => [...prev, e].slice(-500));
       });
 
-      // 历史回放：把 entries 按 type 分流
       s.on(SOCKET_EVENTS.LOG_HISTORY_RES, ({ entries }: { entries: any[] }) => {
         const parsed: LogEntryPayload[] = entries.map((e) => ({
           ...e,
@@ -161,13 +144,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           realTime: e.realTime,
           createdAt: e.createdAt,
         }));
-
-        // 获取当前 members 快照（基于回调里的引用）
-        // 用 ref 解 timing 问题，详见下方 mapper
-        const findUsername = (uid?: string) =>
-          membersRef.current.find((m) => m.userId === uid)?.username ?? '';
-        const findCharacterName = (cid?: string) =>
-          membersRef.current.find((m) => m.character?.id === cid)?.character?.name;
+        const findUsername = (uid?: string) => membersRef.current.find((m) => m.userId === uid)?.username ?? '';
+        const findCharacterName = (cid?: string) => membersRef.current.find((m) => m.character?.id === cid)?.character?.name;
 
         const oocHist: OOCMessage[] = [];
         const icHist: ICMessage[] = [];
@@ -175,7 +153,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
         for (const e of parsed) {
           if (e.type === 'CHAT_OOC') {
-            const already = (prev: OOCMessage[]) => prev.some((m) => m.id === e.id);
             const m: OOCMessage = {
               id: e.id, sessionId,
               authorId: e.authorId ?? '',
@@ -184,7 +161,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               content: String((e.payload as any).content ?? ''),
               realTime: e.realTime,
             };
-            if (!already(oocHist)) oocHist.push(m);
+            if (!oocHist.some((x) => x.id === e.id)) oocHist.push(m);
           } else if (e.type === 'CHAT_IC') {
             const p = e.payload as any;
             const m: ICMessage = {
@@ -196,7 +173,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               characterName: findCharacterName(e.characterId),
               content: String(p.content ?? ''),
               inGameTime: e.inGameTime ?? '08:00',
-              inGameDate: '', // 历史回放没有直接 inGameDate 字段，UI 一般不需要
+              inGameDate: '',
             };
             icHist.push(m);
           } else {
@@ -204,7 +181,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           }
         }
 
-        // 合并而非替换，避免 live 事件之后到达时被覆盖
         setOocMessages((prev) => {
           const seen = new Set(prev.map((m) => m.id));
           return [...prev, ...oocHist.filter((m) => !seen.has(m.id))];
@@ -231,7 +207,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setClock({ inGameTime: c.inGameTime, inGameDate: c.inGameDate, running: c.running, rate: c.rate });
       });
       s.on(SOCKET_EVENTS.PRESENCE_UPDATE, (p: PresenceUpdate) => {
-        // 服务端是 online 状态的唯一来源；这里直接覆盖，character 用本地缓存填补。
         setMembers((prev) => p.members.map((m) => {
           const old = prev.find((x) => x.userId === m.userId);
           return {
@@ -246,7 +221,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         }));
       });
 
-      // 角色库更新（KP 改了武器/物品，或 HP/SAN 变动）→ 用服务端推送的快照直接覆盖本地
       s.on(SOCKET_EVENTS.CHARACTER_UPDATED, ({ characterId, character }: { characterId: string; character?: any }) => {
         if (!character) return;
         setMembers((prev) => prev.map((m) => (
@@ -258,9 +232,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     return () => {
       cancelled = true;
       if (!socket) return;
-      // 离开当前 session 页面（SPA 内部路由切换 / 组件卸载）时，主动告诉服务端下线。
-      // 这样会清掉自身 presence 索引并在 room 里广播；socket 不关，可供后续其它 session 复用。
-      // 若是 socket 已断开/正在重连，emit 会被 socket.io 内部丢弃，无需额外兜底。
       if (socket.connected) {
         socket.emit(SOCKET_EVENTS.LEAVE_SESSION, { sessionId });
       }
@@ -337,7 +308,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     socketRef.current?.emit(SOCKET_EVENTS.EQUIPMENT_DELETE, { sessionId, characterId, id });
   }, [sessionId]);
 
-  // 当前正在查看的车卡：找到 members 里那个 character 数据
   const inspected = inspectingCharacterId
     ? members.find((m) => m.character?.id === inspectingCharacterId)?.character ?? null
     : null;
@@ -345,7 +315,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     ? members.find((m) => m.character?.id === inspectingCharacterId)
     : null;
 
-  // Esc 关闭弹窗
   useEffect(() => {
     if (!inspectingCharacterId) return;
     const onKey = (e: KeyboardEvent) => {
@@ -356,24 +325,15 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   }, [inspectingCharacterId]);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex flex-1 flex-col">
       {!connected && (
-        <div className="bg-red-500/20 border-b border-red-500 text-center text-sm py-1">
+        <div className="border-b border-warn bg-warn/15 px-4 py-2 text-center text-sm text-warn">
           {connectError ?? '连接已断开，正在重连…'}
         </div>
       )}
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr_320px] gap-2 p-2 min-h-0">
-        <div className="min-h-[300px] lg:min-h-0 flex flex-col">
-          <OOCPanel
-            messages={oocMessages}
-            onSend={sendOOC}
-            canSend={true}
-            currentUsername={me?.username ?? ''}
-          />
-        </div>
-
-        <div className="min-h-[300px] lg:min-h-0 flex flex-col">
+      <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_1fr_22rem]">
+        <div className="flex min-h-[20rem] flex-col lg:min-h-0">
           <ICPanel
             messages={icMessages}
             onSend={sendIC}
@@ -383,7 +343,16 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           />
         </div>
 
-        <div className="flex flex-col gap-2 min-h-0">
+        <div className="flex min-h-[20rem] flex-col lg:min-h-0">
+          <OOCPanel
+            messages={oocMessages}
+            onSend={sendOOC}
+            canSend={true}
+            currentUsername={me?.username ?? ''}
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
           <ClockPanel clock={clock} role={role} onControl={controlClock} />
           {role === 'KP' && (
             <HpChangePanel
@@ -400,33 +369,25 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               characters={members.filter((m) => m.character).map((m) => {
                 const c = m.character!;
                 return {
-                  id: c.id,
-                  name: c.name,
+                  id: c.id, name: c.name,
                   str: c.str, con: c.con, siz: c.siz, dex: c.dex,
                   app: c.app, int: c.int, pow: c.pow, edu: c.edu,
-                  skills: c.skills,
-                  sanCurrent: c.san,
-                  luck: c.luck,
+                  skills: c.skills, sanCurrent: c.san, luck: c.luck,
                 };
               })}
               plCharacters={members.filter((m) => m.role === 'PL' && m.character).map((m) => {
                 const c = m.character!;
                 return {
-                  id: c.id,
-                  name: c.name,
+                  id: c.id, name: c.name,
                   str: c.str, con: c.con, siz: c.siz, dex: c.dex,
                   app: c.app, int: c.int, pow: c.pow, edu: c.edu,
-                  skills: c.skills,
-                  sanCurrent: c.san,
-                  luck: c.luck,
+                  skills: c.skills, sanCurrent: c.san, luck: c.luck,
                 };
               })}
               onCreate={createJudgment}
             />
           )}
-          {role === 'KP' && (
-            <DiceRoller onRoll={rollDice} />
-          )}
+          {role === 'KP' && <DiceRoller onRoll={rollDice} />}
           <JudgmentQueue
             judgments={pendingJudgments}
             role={role}
@@ -446,7 +407,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
       <PresenceBar members={members} />
 
-      {/* 角色详情弹窗：所有人均可看，KP 额外获得武器/物品的编辑入口 */}
       <CharacterDetailModal
         character={inspected as CharacterDetail | null}
         ownerUsername={inspectedOwner?.username}

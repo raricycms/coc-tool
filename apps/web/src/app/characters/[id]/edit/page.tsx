@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@coc-tools/db';
@@ -17,15 +16,14 @@ export default async function EditCharacterPage({ params }: { params: Promise<{ 
   if (!c) notFound();
   if (c.ownerId !== user.id) notFound();
   if (c.status !== 'ACTIVE') {
-    // 已撕卡的车卡不允许编辑（防止复活死掉的 PC）
     redirect(`/characters/${id}`);
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 max-w-3xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">编辑车卡 — {c.name}</h1>
-        <Link href={`/characters/${id}`} className="btn-ghost text-sm">← 返回详情</Link>
+    <main className="mx-auto max-w-3xl px-4 py-10">
+      <header className="mb-8">
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">编辑车卡</h1>
+        <p className="mt-1 text-sm text-ink-soft">正在修改「{c.name}」</p>
       </header>
       <CharacterForm
         initial={{
