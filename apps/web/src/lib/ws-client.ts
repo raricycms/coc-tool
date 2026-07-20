@@ -17,6 +17,28 @@ import { io, Socket } from 'socket.io-client';
 let socket: Socket | null = null;
 let cachedToken: string | null = null;
 let inflightToken: Promise<string | null> | null = null;
+let pagehideInstalled = false;
+
+/**
+ * 注册一次：tab/窗口被卸载时立刻断开 socket。
+ * 否则服务端要等 socket.io 自带 ping/pong 超时（默认 ~25s）才会收到 disconnect，
+ * 这段时间内「关浏览器」的成员还会显示绿色。
+ * 用 `pagehide` 而不是 `beforeunload`：移动端切后台、可恢复 bf-cache 都不会误断，
+ * 真正卸载（包括 bf-cache 入栈）时才触发。
+ */
+function installPagehideHandler() {
+  if (pagehideInstalled) return;
+  if (typeof window === 'undefined') return;
+  pagehideInstalled = true;
+  window.addEventListener('pagehide', () => {
+    const s = socket;
+    if (s && s.connected) {
+      s.disconnect();
+    }
+    socket = null;
+    invalidateToken();
+  });
+}
 
 async function fetchWsToken(): Promise<string | null> {
   try {
@@ -54,6 +76,7 @@ function invalidateToken() {
 }
 
 export async function getSocket(): Promise<Socket> {
+  installPagehideHandler();
   if (socket && socket.connected) return socket;
   if (socket) socket.disconnect();
 

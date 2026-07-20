@@ -21,6 +21,7 @@ interface Member {
   username: string;
   avatar: string | null;
   role: 'KP' | 'PL' | 'SPECTATOR';
+  online: boolean;
   characterId?: string;
   character?: {
     id: string; name: string;
@@ -122,7 +123,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setClock({ inGameTime: c.inGameTime, inGameDate: c.inGameDate, running: c.running, rate: c.rate });
       });
       s.on(SOCKET_EVENTS.PRESENCE_UPDATE, (p: PresenceUpdate) => {
-        // 合并：existing member 取最新名字
+        // 服务端是 online 状态的唯一来源；这里直接覆盖，character 用本地缓存填补。
         setMembers((prev) => p.members.map((m) => {
           const old = prev.find((x) => x.userId === m.userId);
           return {
@@ -130,6 +131,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             username: m.username,
             avatar: m.avatar,
             role: m.role,
+            online: m.online,
             characterId: m.characterId,
             character: old?.character,
           };
@@ -140,6 +142,12 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     return () => {
       cancelled = true;
       if (!socket) return;
+      // 离开当前 session 页面（SPA 内部路由切换 / 组件卸载）时，主动告诉服务端下线。
+      // 这样会清掉自身 presence 索引并在 room 里广播；socket 不关，可供后续其它 session 复用。
+      // 若是 socket 已断开/正在重连，emit 会被 socket.io 内部丢弃，无需额外兜底。
+      if (socket.connected) {
+        socket.emit(SOCKET_EVENTS.LEAVE_SESSION, { sessionId });
+      }
       if (onConnect) socket.off('connect', onConnect);
       if (onDisconnect) socket.off('disconnect', onDisconnect as any);
       if (onConnectError) socket.off('connect_error', onConnectError);

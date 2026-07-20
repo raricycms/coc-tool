@@ -61,6 +61,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           username: m.user.username,
           avatar: m.user.avatarUrl,
           role: m.role as 'KP' | 'PL' | 'SPECTATOR',
+          // SSR 无法判断谁真正连着 socket：统一标离线，等客户端连上后再被 PRESENCE_UPDATE 覆盖。
+          online: false,
           characterId: m.characterId ?? undefined,
           character: m.character ? {
             id: m.character.id,

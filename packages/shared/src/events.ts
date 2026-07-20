@@ -22,6 +22,7 @@ export const SOCKET_EVENTS = {
   CLOCK_CONTROL: 'clock:control',
   HP_CHANGE: 'hp:change',
   JOIN_SESSION: 'session:join',
+  LEAVE_SESSION: 'session:leave',
   LOG_HISTORY: 'log:history',
 
   // 服务端 → 客户端
@@ -115,6 +116,12 @@ export interface PresenceUpdate {
     role: 'KP' | 'PL' | 'SPECTATOR';
     characterId?: string;
     characterName?: string;
+    /**
+     * 该用户是否当前至少有一个 socket 落在这个 session 房间内。
+     * UI 用它决定绿/灰圆点；服务端保证在线集合与 DB membership 的并集里
+     * 每一位都标注正确。
+     */
+    online: boolean;
   }>;
 }
 

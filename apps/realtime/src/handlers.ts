@@ -17,7 +17,6 @@ import {
   type JudgmentCreatedEvent,
   type JudgmentResultEvent,
   type ClockStateEvent,
-  type PresenceUpdate,
   type LogEntryPayload,
 } from '@coc-tools/shared';
 import { ZodError } from 'zod';
@@ -36,6 +35,7 @@ import {
   getCurrentClock,
   setClockUpdateHandler,
 } from './state.js';
+import { attachAndBroadcast, detachAndBroadcast, detachOneSessionAndBroadcast } from './presence.js';
 import type { AuthedSocket } from './auth.js';
 
 /** 把抛出的错误翻译成中文消息，Zod 错误走专用格式化。 */
@@ -67,6 +67,18 @@ export async function registerHandlers(io: Server) {
     s.on(SOCKET_EVENTS.JOIN_SESSION, async ({ sessionId }: { sessionId: string }) => {
       try {
         await joinRoom(io, s, sessionId);
+      } catch (err) {
+        s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      }
+    });
+
+    // ── leaveRoom ──
+    // SPA 内部从 /sessions/[id] 跳到别处时让客户端主动发：socket 不断，
+    // 但从这一 session 的 presence 下线，并且从 socket.io 的 room 里也退出，
+    // 避免之后别的事件扩散过来。disconnect 时由 disconnect 处理器兜底。
+    s.on(SOCKET_EVENTS.LEAVE_SESSION, async ({ sessionId }: { sessionId: string }) => {
+      try {
+        await detachOneSessionAndBroadcast(io, s, sessionId);
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
@@ -432,7 +444,11 @@ export async function registerHandlers(io: Server) {
 
     // ── disconnect ──
     s.on('disconnect', () => {
-      // 不在这里写 leaveAt，留给业务层显式调用
+      // 清理 presence 索引；并为「该用户从此在该 session 全离线」的 session 广播一次完整 presence。
+      // leaveAt 仍由业务层显式调用（不再扩展这里，避免误把「网络抖动」当成「退出 session」）。
+      detachAndBroadcast(io, s.id).catch((err) => {
+        console.error('[realtime] detachAndBroadcast failed:', err);
+      });
     });
   });
 }
@@ -464,23 +480,8 @@ async function joinRoom(io: Server, s: AuthedSocket, sessionId: string) {
   await initRuntime(sessionId);
   s.join(`session:${sessionId}`);
 
-  // 推送当前成员
-  const allMembers = await prisma.sessionMember.findMany({
-    where: { sessionId, leftAt: null },
-    include: { user: true, character: true },
-  });
-  const presence: PresenceUpdate = {
-    sessionId,
-    members: allMembers.map((m) => ({
-      userId: m.userId,
-      username: m.user.username,
-      avatar: m.user.avatarUrl,
-      role: m.role as any,
-      characterId: m.characterId ?? undefined,
-      characterName: m.character?.name,
-    })),
-  };
-  io.to(`session:${sessionId}`).emit(SOCKET_EVENTS.PRESENCE_UPDATE, presence);
+  // 注册到 presence 索引并广播一次完整在线名单（带 online 字段）
+  await attachAndBroadcast(io, s, sessionId);
 
   // 推送当前时钟
   const clock = getCurrentClock(sessionId);
