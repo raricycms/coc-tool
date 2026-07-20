@@ -14,23 +14,11 @@ const STATS_FULL: PrimaryStats = {
 
 describe('attributes', () => {
   describe('computeMov', () => {
-    it('basic DEX only for young', () => {
-      expect(computeMov(60, 60, 50, 30)).toBe(60);
-    });
-    it('STR < SIZ reduces mov by 1', () => {
-      expect(computeMov(60, 30, 60, 30)).toBe(59);
-    });
-    it('age 40 reduces by 1', () => {
-      expect(computeMov(60, 60, 60, 40)).toBe(59);
-    });
-    it('age 50 reduces by 2', () => {
-      expect(computeMov(60, 60, 60, 50)).toBe(58);
-    });
-    it('age 80 reduces by 5', () => {
-      expect(computeMov(60, 60, 60, 80)).toBe(55);
-    });
-    it('never below 1', () => {
-      expect(computeMov(0, 0, 100, 90)).toBe(1);
+    it('always 8 for humans (per docs/技能.md)', () => {
+      expect(computeMov(60, 60, 50, 30)).toBe(8);
+      expect(computeMov(60, 30, 60, 30)).toBe(8);
+      expect(computeMov(60, 60, 60, 80)).toBe(8);
+      expect(computeMov(0, 0, 100, 90)).toBe(8);
     });
   });
 
@@ -50,19 +38,19 @@ describe('attributes', () => {
   });
 
   describe('derive', () => {
-    it('computes all derived stats correctly', () => {
+    it('computes all derived stats correctly (tutorial formulas)', () => {
       const d = derive(STATS_FULL, 30);
-      expect(d.hpMax).toBe(12);          // ceil((70+50)/10) = 12
-      expect(d.mpMax).toBe(10);          // ceil(50/5) = 10
-      expect(d.sanMax).toBe(250);        // 50 * 5
+      expect(d.hpMax).toBe(12);          // floor((70+50)/10) = 12
+      expect(d.mpMax).toBe(10);          // floor(50/5) = 10
+      expect(d.sanMax).toBe(50);         // = POW (per tutorial)
       expect(d.build).toBe(110);         // 60 + 50
       expect(d.damageBonus).toBe('0');   // 110 in [85, 124]
-      expect(d.mov).toBe(60);
+      expect(d.mov).toBe(8);             // humans fixed
     });
 
     it('edge: extreme stats', () => {
       const d = derive({ ...STATS_FULL, str: 1, con: 1, siz: 1 }, 20);
-      expect(d.hpMax).toBe(1);
+      expect(d.hpMax).toBe(0);           // floor((1+1)/10) = 0
       expect(d.mpMax).toBe(10);
       expect(d.build).toBe(2);
       expect(d.damageBonus).toBe('-2');
@@ -72,7 +60,7 @@ describe('attributes', () => {
       const d = derive({ ...STATS_FULL, str: 90, con: 90, siz: 90, dex: 90, pow: 90 }, 30);
       expect(d.hpMax).toBe(18);
       expect(d.mpMax).toBe(18);
-      expect(d.sanMax).toBe(450);
+      expect(d.sanMax).toBe(90);         // = POW
       expect(d.build).toBe(180);
       expect(d.damageBonus).toBe('+1d6');
     });

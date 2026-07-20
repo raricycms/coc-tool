@@ -42,8 +42,8 @@ async function makeSession(kpId: string, plId: string): Promise<{ sessionId: str
     data: {
       ownerId: plId, name: 'PL 卡', era: 'modern',
       ...VALID_PRIMARY,
-      hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
-      hpCurrent: 12, mpCurrent: 10, sanCurrent: 100, luckCurrent: 50,
+      hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
+      hpCurrent: 12, mpCurrent: 10, sanCurrent: 0, luckCurrent: 50,
       skills: { create: [{ name: '侦察', value: 50 }, { name: '克苏鲁知识', value: 5, isMythos: true }] },
     },
   });
@@ -88,7 +88,7 @@ describe('settlement flow', () => {
     expect(san.data.data.step).toBe('KNOWLEDGE_GAIN');
 
     let char = await prisma.character.findUnique({ where: { id: charId } });
-    expect(char?.sanCurrent).toBe(105);
+    expect(char?.sanCurrent).toBe(5);  // 0 + 5 = 5, sanMax=50, 未截断
 
     // 3) Mythos +3（自动 -3 SAN）
     const know = await callRoute(settleKnowledgeRoute.POST, {
@@ -104,7 +104,7 @@ describe('settlement flow', () => {
     });
     const mythos = char?.skills.find((s) => s.name === '克苏鲁知识');
     expect(mythos?.value).toBe(8);
-    expect(char?.sanCurrent).toBe(102);
+    expect(char?.sanCurrent).toBe(2);  // 5 - 3 = 2 (Mythos 自动扣 SAN)
 
     // 4) 撕卡
     const retire = await callRoute(settleRetireRoute.POST, {
@@ -152,29 +152,29 @@ describe('settlement flow', () => {
     await prisma.settlement.create({ data: { sessionId, step: 'SAN_RECOVERY' } });
 
     await loginAs(kp.id, kp.username);
-    // 起始 SAN=100，+99 后 =199 < 250 不截断；为验证 clamp 我们手工先回滚测试
-    // 直接把 amount 调到 schema 上限 99，能验证 clamp 路径（虽然不会真触发）
+    // 起始 SAN=100，sanMax=50，立刻就会被截断。先证未截断路径：把 sanCurrent 调到 0
+    await prisma.character.update({ where: { id: charId }, data: { sanCurrent: 0 } });
     const res = await callRoute(settleSanRoute.POST, {
       url: `http://localhost/api/sessions/${sessionId}/settlement/san-recovery`, method: 'POST',
-      body: { sanRecoveries: [{ characterId: charId, amount: 99 }] },
+      body: { sanRecoveries: [{ characterId: charId, amount: 40 }] },
     });
     expect(res.status).toBe(200);
-    // 100 + 99 = 199，sanMax=250，未截断
+    // 0 + 40 = 40，sanMax=50，未截断
     let char = await prisma.character.findUnique({ where: { id: charId } });
-    expect(char?.sanCurrent).toBe(199);
+    expect(char?.sanCurrent).toBe(40);
 
     // 直接 SQL 把 sanCurrent 设到接近 max，再调一次看 clamp
-    await prisma.character.update({ where: { id: charId }, data: { sanCurrent: 240 } });
+    await prisma.character.update({ where: { id: charId }, data: { sanCurrent: 45 } });
     await prisma.settlement.update({
       where: { sessionId }, data: { step: 'SAN_RECOVERY', sanRecoveries: null },
     });
     const res2 = await callRoute(settleSanRoute.POST, {
       url: `http://localhost/api/sessions/${sessionId}/settlement/san-recovery`, method: 'POST',
-      body: { sanRecoveries: [{ characterId: charId, amount: 50 }] },
+      body: { sanRecoveries: [{ characterId: charId, amount: 20 }] },
     });
     expect(res2.status).toBe(200);
     char = await prisma.character.findUnique({ where: { id: charId } });
-    expect(char?.sanCurrent).toBe(250);  // 240 + 50 = 290 → clamp 到 250
+    expect(char?.sanCurrent).toBe(50);  // 45 + 20 = 65 → clamp 到 sanMax=50
   });
 
   it('cannot complete a non-settling session', async () => {

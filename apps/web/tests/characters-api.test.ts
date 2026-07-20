@@ -40,7 +40,7 @@ async function makeChar(ownerId: string, name = '林远'): Promise<string> {
     data: {
       ownerId, name, era: 'modern',
       ...VALID_PRIMARY,
-      hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
+      hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
       hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
       skills: { create: [{ name: '侦察', value: 60 }] },
     },
@@ -78,7 +78,7 @@ describe('characters API', () => {
     expect(ch.name).toBe('林远');
     expect(ch.hpMax).toBe(12);
     expect(ch.mpMax).toBe(10);
-    expect(ch.sanMax).toBe(250);
+    expect(ch.sanMax).toBe(50);
     expect(ch.build).toBe(110);
     expect(ch.damageBonus).toBe('0');
     expect(ch.skills).toHaveLength(2);
@@ -161,7 +161,7 @@ describe('characters API', () => {
     expect(res1.data.data.era).toBe('victorian');
     expect(res1.data.data.hpMax).toBe(12);  // 未触发 derive
 
-    // 改 primary：CON 从 70 → 80，hpMax 应重算为 ceil((80+50)/10)=13
+    // 改 primary：CON 从 70 → 80，hpMax 应重算为 floor((80+50)/10)=13
     const res2 = await callRoute(characterByIdRoute.PATCH, {
       url: `http://localhost/api/characters/${charId}`, method: 'PATCH',
       body: { primary: { ...VALID_PRIMARY, con: 80 } },

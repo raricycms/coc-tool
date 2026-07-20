@@ -1,18 +1,13 @@
 /**
  * CoC 调查员属性派生计算。
  *
- * 公式以 CoC 7e 常见「十位制」为基础：
- *   HP_max  = ceil((CON + SIZ) / 10)
- *   MP_max  = ceil(POW / 5)
- *   SAN_max = POW * 5
- *   MOV     = DEX（基础）；STR < SIZ 时 -1；按年龄逐级 -1
+ * 公式以项目自带教程 `docs/技能.md`（简易版）为准：
+ *   HP_max  = (CON + SIZ) // 10       （整除）
+ *   MP_max  = POW // 5                （整除）
+ *   SAN_max = POW                     （与教程一致；不采用 CoC 7e 的 POW×5）
+ *   MOV     = 8                       （人类固定；与教程一致）
  *   build   = STR + SIZ
  *   DB      = 根据 build 查表（伤害加成）
- *
- * 注意：
- *   - 所有公式中"十位制"与"个位制"按 CoC 7e 主流占位。
- *   - 实际游戏中 HP 也可能是 (CON+SIZ)/2（个位制）。本项目选择十位制；
- *     如规则书另有规定请改。
  */
 
 export interface PrimaryStats {
@@ -36,19 +31,12 @@ export interface DerivedStats {
   damageBonus: string;
 }
 
-/** MOV 计算：DEX 基础 + STR<SIZ 减一 + 年龄修正 */
-export function computeMov(dex: number, str: number, siz: number, age: number): number {
-  let mov = dex;
-  if (str < siz) mov -= 1;
-  if (age >= 80) mov -= 5;
-  else if (age >= 70) mov -= 4;
-  else if (age >= 60) mov -= 3;
-  else if (age >= 50) mov -= 2;
-  else if (age >= 40) mov -= 1;
-  return Math.max(1, mov);
+/** MOV 计算（按教程：人类固定 8）。参数保留以兼容旧调用；忽略。 */
+export function computeMov(_dex: number, _str: number, _siz: number, _age: number): number {
+  return 8;
 }
 
-/** 伤害加成表（CoC 7e 占位） */
+/** 伤害加成表（教程占位） */
 export function lookupDamageBonus(build: number): string {
   if (build <= 64) return '-2';
   if (build <= 84) return '-1';
@@ -57,12 +45,12 @@ export function lookupDamageBonus(build: number): string {
   return '+1d6';
 }
 
-export function derive(primary: PrimaryStats, age: number): DerivedStats {
+export function derive(primary: PrimaryStats, _age: number): DerivedStats {
   const build = primary.str + primary.siz;
-  const hpMax = Math.ceil((primary.con + primary.siz) / 10);
-  const mpMax = Math.ceil(primary.pow / 5);
-  const sanMax = primary.pow * 5;
-  const mov = computeMov(primary.dex, primary.str, primary.siz, age);
+  const hpMax = Math.floor((primary.con + primary.siz) / 10);
+  const mpMax = Math.floor(primary.pow / 5);
+  const sanMax = primary.pow;
+  const mov = 8;
   const damageBonus = lookupDamageBonus(build);
   return { hpMax, mpMax, sanMax, mov, build, damageBonus };
 }

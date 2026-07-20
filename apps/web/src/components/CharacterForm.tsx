@@ -199,12 +199,14 @@ export function CharacterForm() {
             <h2 className="font-bold">属性</h2>
             <button type="button" onClick={randomPrimary} className="btn-ghost text-sm">🎲 随机生成</button>
           </header>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-2">
             {(['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const).map((k) => (
               <FieldError key={k} error={get(`primary.${k}`)}>
-                <label className="label uppercase">{k}</label>
-                <input type="number" className="input" value={primary[k]} min={1} max={100}
-                  onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }} />
+                <div className="flex items-center gap-3">
+                  <label className="label uppercase w-12 shrink-0">{k}</label>
+                  <input type="number" className="input flex-1" value={primary[k]} min={1}
+                    onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }} />
+                </div>
               </FieldError>
             ))}
           </div>

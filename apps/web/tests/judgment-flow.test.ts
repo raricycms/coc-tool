@@ -26,7 +26,7 @@ describe('judgment business logic', () => {
       data: {
         ownerId: user.id, name: 'PC', era: 'modern',
         str: 60, con: 70, siz: 50, dex: 60, app: 50, int: 65, pow: 50, edu: 70, luck: 50,
-        hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
+        hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
         hpCurrent: 12, mpCurrent: 10, sanCurrent: 50, luckCurrent: 50,
         skills: { create: [{ name: '侦察', value: 50 }] },
       },

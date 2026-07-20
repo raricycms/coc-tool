@@ -34,7 +34,7 @@ async function createCharacter(userId: string, name: string): Promise<string> {
     data: {
       ownerId: userId, name, era: 'modern',
       ...VALID_PRIMARY,
-      hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
+      hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
       hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
     },
   });

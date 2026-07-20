@@ -42,9 +42,9 @@ describe('character CRUD', () => {
     // 改为直接 import service 层测试：
     const { derive } = await import('@coc-tools/coc-rules');
     const d = derive(VALID_PRIMARY, 30);
-    expect(d.hpMax).toBe(12);  // ceil((70+50)/10)
+    expect(d.hpMax).toBe(12);  // floor((70+50)/10)
     expect(d.mpMax).toBe(10);
-    expect(d.sanMax).toBe(250);
+    expect(d.sanMax).toBe(50); // tutorial: SAN_max = POW
     expect(d.build).toBe(110);
     expect(d.damageBonus).toBe('0');
   });
@@ -60,7 +60,7 @@ describe('character CRUD', () => {
         age: 30,
         era: '1920s',
         ...VALID_PRIMARY,
-        hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
+        hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
         hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
         skills: { create: [{ name: '侦察', value: 60 }, { name: '聆听', value: 55 }] },
       },
@@ -95,7 +95,7 @@ describe('character CRUD', () => {
       data: {
         ownerId: aliceId, name: 'A', era: 'modern',
         ...VALID_PRIMARY,
-        hpMax: 12, mpMax: 10, sanMax: 250, mov: 8, build: 110, damageBonus: '0',
+        hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
         hpCurrent: 12, mpCurrent: 10, sanCurrent: 250, luckCurrent: 50,
       },
     });
