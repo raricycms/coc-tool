@@ -188,4 +188,61 @@ describe('settlement flow', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // 回归 fix：KP 在跑团页点「→ 结算」链接直接落到 wizard 页。
+  // 旧版 wizard 没主动调开始结算接口，第一步 SAN 恢复就会被 `not_settling` 拒掉，
+  // 用户看到一句没有任何上下文的「SAN 恢复失败」。现在 wizard 的页面入口在
+  // 服务端把 Session 切到 SETTLING 并补上 Settlement 行；这里用事务来镜像
+  // 那个行为，验证前置条件满足后 san-recovery 接口能正常跑通。
+  it('KP 直接从 RUNNING 进入结算页 → SAN 恢复接口直接可用', async () => {
+    const kp = await register('kp_direct_enter');
+    const pl = await register('pl_direct_enter');
+    const { sessionId, charId } = await makeSession(kp.id, pl.id);
+
+    // 模拟 wizard 页面入口的副作用：把 RUNNING → SETTLING + upsert Settlement。
+    // 注意：keepTransactions=false 时 settlement.update 会跑在另一个连接上，
+    // 落库时间戳会被刷新，但 path 是一致的（crud 都不需要按时间排序）。
+    await prisma.$transaction([
+      prisma.session.update({ where: { id: sessionId }, data: { status: 'SETTLING' } }),
+      prisma.settlement.upsert({
+        where: { sessionId },
+        create: { sessionId, step: 'SAN_RECOVERY' },
+        update: {},
+      }),
+    ]);
+
+    let session = await prisma.session.findUnique({ where: { id: sessionId } });
+    expect(session?.status).toBe('SETTLING');
+    let settle = await prisma.settlement.findUnique({ where: { sessionId } });
+    expect(settle?.step).toBe('SAN_RECOVERY');
+
+    await loginAs(kp.id, kp.username);
+    const res = await callRoute(settleSanRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/san-recovery`, method: 'POST',
+      body: { sanRecoveries: [{ characterId: charId, amount: 5 }] },
+    });
+    expect(res.status).toBe(200);
+    expect(res.data.data.step).toBe('KNOWLEDGE_GAIN');
+
+    const char = await prisma.character.findUnique({ where: { id: charId } });
+    expect(char?.sanCurrent).toBe(5);
+  });
+
+  // 反向证明：不走自动过渡、直接把 SAN 恢复请求丢给仍在 RUNNING 的 session
+  // 会被接口按设计要求拒，给 wizard 一个明确的 `not_settling`。这能锁住
+  // 「接口层不允许拿一个非结算态去动 SAN」这条约定不被后续 refactor 偷偷放宽。
+  it('未进入结算态时 SAN 恢复必须被拒（not_settling）', async () => {
+    const kp = await register('kp_no_entrance');
+    const pl = await register('pl_no_entrance');
+    const { sessionId, charId } = await makeSession(kp.id, pl.id);
+    // 注意：makeSession 默认是 RUNNING，没有任何前向过渡。
+
+    await loginAs(kp.id, kp.username);
+    const res = await callRoute(settleSanRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/san-recovery`, method: 'POST',
+      body: { sanRecoveries: [{ characterId: charId, amount: 5 }] },
+    });
+    expect(res.status).toBe(400);
+    expect(res.data.error.code).toBe('not_settling');
+  });
 });
