@@ -76,6 +76,7 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
             damageBonus: c.damageBonus,
             era: c.era,
             occupation: c.occupation,
+            background: c.background,
             skills: c.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
             weapons: c.weapons.map((w) => ({
               id: w.id, name: w.name, skill: w.skill, damage: w.damage,

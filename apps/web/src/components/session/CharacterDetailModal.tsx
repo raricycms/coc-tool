@@ -12,6 +12,7 @@ export interface CharacterDetail {
   damageBonus: string;
   str: number; con: number; siz: number; dex: number;
   app: number; int: number; pow: number; edu: number;
+  background?: string | null;
   skills: Array<{ name: string; value: number; isMythos: boolean }>;
   weapons: Array<{ id: string; name: string; skill: string; damage: string; range?: string | null; ammo?: number | null; note?: string | null }>;
   equipment: Array<{ id: string; name: string; quantity: number; note?: string | null }>;
@@ -85,6 +86,7 @@ export function CharacterDetailModal({
             onUpsert={onEquipmentUpsert}
             onDelete={onEquipmentDelete}
           />
+          {character.background && <BackgroundSection background={character.background} />}
           {!isKp && (
             <p className="text-center text-[11px] italic text-ink-muted">
               只读视图 · 武器和物品由 KP 管理
@@ -509,5 +511,14 @@ function Bar({ label, value, max, pct, color }: { label: string; value: number; 
         <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
+  );
+}
+
+function BackgroundSection({ background }: { background: string }) {
+  return (
+    <section className="card">
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">调查员背景</h3>
+      <p className="whitespace-pre-wrap text-sm text-ink">{background}</p>
+    </section>
   );
 }

@@ -95,6 +95,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             mpMax: m.character.mpMax,
             luck: m.character.luckCurrent,
             damageBonus: m.character.damageBonus,
+            background: m.character.background,
             skills: m.character.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
             weapons: m.character.weapons.map((w) => ({
               id: w.id, name: w.name, skill: w.skill, damage: w.damage,

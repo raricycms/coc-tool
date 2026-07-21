@@ -832,6 +832,7 @@ async function broadcastCharacter(io: Server, sessionId: string, characterId: st
       mp: c.mpCurrent, mpMax: c.mpMax,
       luck: c.luckCurrent,
       damageBonus: c.damageBonus,
+      background: c.background,
       skills: c.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
       weapons: c.weapons.map((w) => ({
         id: w.id, name: w.name, skill: w.skill, damage: w.damage,

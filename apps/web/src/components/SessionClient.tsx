@@ -35,6 +35,7 @@ interface Member {
     damageBonus: string;
     str: number; con: number; siz: number; dex: number;
     app: number; int: number; pow: number; edu: number;
+    background?: string | null;
     skills: Array<{ name: string; value: number; isMythos: boolean }>;
     weapons: Array<{ id: string; name: string; skill: string; damage: string; range?: string | null; ammo?: number | null; note?: string | null }>;
     equipment: Array<{ id: string; name: string; quantity: number; note?: string | null }>;

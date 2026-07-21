@@ -22,6 +22,7 @@ export interface ReadOnlyCharacter {
   damageBonus: string;
   era?: string | null;
   occupation?: string | null;
+  background?: string | null;
   skills: Array<{ name: string; value: number; isMythos: boolean }>;
   weapons: Array<{
     id: string; name: string; skill: string; damage: string;
@@ -77,6 +78,7 @@ export function CharacterViewModal({ character, applicantUsername, onClose }: Pr
             <WeaponsSection char={character} />
             <EquipmentSection char={character} />
           </div>
+          {character.background && <BackgroundSection background={character.background} />}
         </div>
       </div>
     </div>
@@ -210,5 +212,14 @@ function Bar({ label, value, max, pct, color }: {
         <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
+  );
+}
+
+function BackgroundSection({ background }: { background: string }) {
+  return (
+    <section className="card">
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-ink-soft">调查员背景</h3>
+      <p className="whitespace-pre-wrap text-sm text-ink">{background}</p>
+    </section>
   );
 }
