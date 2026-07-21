@@ -4,10 +4,39 @@ import { RecruitmentUpdateSchema } from '@coc-tools/shared';
 import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+/**
+ * 检查当前用户是否能查看该招募：
+ * - 公开招募：所有人都能看
+ * - link 招募：KP 本人 / 已报名者 / session 成员可见
+ */
+async function canViewRecruitment(recruitmentId: string, userId: string | null): Promise<boolean> {
+  const r = await prisma.recruitment.findUnique({
+    where: { id: recruitmentId },
+    select: { visibility: true, kpId: true },
+  });
+  if (!r) return false;
+  if (r.visibility === 'public') return true;
+  if (userId && r.kpId === userId) return true;
+  if (userId) {
+    const app = await prisma.application.findFirst({
+      where: { recruitmentId, applicantId: userId },
+      select: { id: true },
+    });
+    if (app) return true;
+  }
+  return false;
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let rawBody: unknown = null;
   try {
     const { id } = await params;
+    // 优先用 session 校验，未登录且私密招募会 404
+    const session = await requireUser().catch(() => null);
+    const userId = session?.id ?? null;
+    const allowed = await canViewRecruitment(id, userId);
+    if (!allowed) return fail(404, 'not_found');
+
     const r = await prisma.recruitment.findUnique({
       where: { id },
       include: {
@@ -42,6 +71,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (maxPlayers < minPlayers) {
       return fail(400, 'invalid_input', 'maxPlayers 必须 >= minPlayers');
     }
+    // 缩小 maxPlayers 不能小于已通过 PL 数量
+    if (body.maxPlayers !== undefined && body.maxPlayers < r.maxPlayers) {
+      const approvedCount = await prisma.application.count({
+        where: { recruitmentId: id, status: 'APPROVED' },
+      });
+      if (body.maxPlayers < approvedCount) {
+        return fail(400, 'max_below_approved', `maxPlayers 不能小于已通过的 ${approvedCount} 人`);
+      }
+    }
 
     const updated = await prisma.recruitment.update({
       where: { id },
@@ -67,9 +105,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   try {
     const user = await requireUser();
     const { id } = await params;
-    const r = await prisma.recruitment.findUnique({ where: { id } });
+    const r = await prisma.recruitment.findUnique({
+      where: { id },
+      include: { session: { select: { id: true } } },
+    });
     if (!r) return fail(404, 'not_found');
     if (r.kpId !== user.id) return fail(403, 'forbidden');
+    if (r.session) {
+      return fail(400, 'session_started', '招募已开团，不能关闭');
+    }
     await prisma.recruitment.update({
       where: { id },
       data: { status: 'CLOSED' },

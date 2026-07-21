@@ -14,7 +14,6 @@ import { useState } from 'react';
 
 export type NavSession = {
   username: string;
-  role: string;
 } | null;
 
 interface NavLink {

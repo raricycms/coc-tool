@@ -46,25 +46,25 @@ describe('/api/coc/roll', () => {
     expect(res.data.error.code).toBe('internal_error');
   });
 
-  it('d= 默认 10，s= 默认 1：返回 1d10（在 [1, 10]）', async () => {
-    // route handler 内部 `rollDie(d)`：默认 d=10 → 单颗 d10。注意 s 仅用于
-    // 校验范围，不参与投骰（这是 handler 现有行为，下面断言仅校对它）。
+  it('d= 默认 10，s= 默认 1：返回 10d1（投 10 个 d1，结果固定 10）', async () => {
     const res = await callRoute(cocRollRoute.GET, {
       url: 'http://localhost/api/coc/roll',
     });
     expect(res.status).toBe(200);
     expect(res.data.data.expression).toBe('10d1');
-    expect(res.data.data.value).toBeGreaterThanOrEqual(1);
-    expect(res.data.data.value).toBeLessThanOrEqual(10);
+    // d1 骰永远 = 1，所以 10d1 总和固定为 10
+    expect(res.data.data.value).toBe(10);
+    expect(res.data.data.rolls).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
-  it('显式 d=3, s=6 → 返回 1d3（在 [1, 3]）', async () => {
+  it('显式 d=3, s=6 → 返回 3d6（在 [3, 18]）', async () => {
     const res = await callRoute(cocRollRoute.GET, {
       url: 'http://localhost/api/coc/roll?d=3&s=6',
     });
     expect(res.status).toBe(200);
-    expect(res.data.data.value).toBeGreaterThanOrEqual(1);
-    expect(res.data.data.value).toBeLessThanOrEqual(3);
+    expect(res.data.data.value).toBeGreaterThanOrEqual(3);
+    expect(res.data.data.value).toBeLessThanOrEqual(18);
+    expect(res.data.data.rolls).toHaveLength(3);
   });
 
   it('s 超界（>100）→ 400', async () => {

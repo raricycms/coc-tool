@@ -222,8 +222,11 @@ export default async function DashboardPage() {
 
 function sessionStatusLabel(s: string): string {
   switch (s) {
-    case 'OPEN': return '进行中';
-    case 'CLOSED': return '已结团';
+    case 'RUNNING': return '进行中';
+    case 'PAUSED': return '已暂停';
+    case 'SETTLING': return '结算中';
+    case 'FINISHED': return '已完结';
+    case 'ABANDONED': return '已放弃';
     default: return s;
   }
 }

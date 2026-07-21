@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const SanRecoverySchema = z.object({
   sanRecoveries: z.array(z.object({
     characterId: z.string(),
-    amount: z.number().int().min(-99).max(99),
+    // 恢复只能 >= 0（扣减走 SAN check / 神话扣减，不应从这一步走）
+    amount: z.number().int().min(0).max(99),
   })),
 });
 

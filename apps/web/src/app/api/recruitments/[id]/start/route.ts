@@ -22,6 +22,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     const approved = r.applications.filter((a) => a.status === 'APPROVED');
     if (approved.length === 0) return fail(400, 'no_approved_applicants');
+    if (approved.length < r.minPlayers) {
+      return fail(400, 'below_min_players', `已通过 ${approved.length} 人，至少需要 ${r.minPlayers} 人`);
+    }
 
     const session = await prisma.$transaction(async (tx) => {
       // 关闭招募

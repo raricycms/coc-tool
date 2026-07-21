@@ -168,6 +168,9 @@ export async function registerHandlers(io: Server) {
               content: data.content,
               characterId: data.characterId,
               characterName: data.characterName,
+              // 把日期也写进 payload，避免翻历史时只剩时间
+              inGameTime: clock?.inGameTime,
+              inGameDate: clock?.inGameDate,
             }),
             inGameTime: clock?.inGameTime,
           },
@@ -398,13 +401,18 @@ export async function registerHandlers(io: Server) {
 
         // 若有 SAN 损失，更新角色并写 SAN_CHANGE 日志
         if (scLoss && scLoss > 0) {
-          const char = await prisma.character.findUnique({ where: { id: judgment.characterId } });
-          if (char) {
-            const sanAfter = Math.max(0, char.sanCurrent - scLoss);
-            await prisma.character.update({
-              where: { id: char.id },
-              data: { sanCurrent: sanAfter },
-            });
+          // 用 Prisma decrement 在 SQL 层做"减去 scLoss，但不低于 0"，避免并发两次 SAN 扣血
+          // 互相覆盖（每个 handler 都读到旧 sanCurrent → 都算出同一个 sanAfter）。
+          await prisma.$executeRaw`
+            UPDATE Character
+            SET sanCurrent = MAX(0, sanCurrent - ${scLoss})
+            WHERE id = ${judgment.characterId}
+          `;
+          const charAfter = await prisma.character.findUnique({
+            where: { id: judgment.characterId },
+          });
+          if (charAfter) {
+            const sanAfter = charAfter.sanCurrent;
             const lossDesc = sanLossExpr && sanLossRolls
               ? `${sanLossExpr}（投出 ${sanLossRolls.join('+')}）`
               : `${scLoss}`;
@@ -412,11 +420,11 @@ export async function registerHandlers(io: Server) {
               data: {
                 sessionId: payload.sessionId,
                 type: 'SAN_CHANGE',
-                characterId: char.id,
+                characterId: charAfter.id,
                 payload: JSON.stringify({
                   delta: -scLoss,
                   sanAfter,
-                  sanMax: char.sanMax,
+                  sanMax: charAfter.sanMax,
                   reason: `SAN check ${sanPassed ? '成功' : '失败'}（${SUCCESS_LABELS[result.successLevel]} · ${lossDesc}）`,
                 }),
                 inGameTime: clock?.inGameTime,
@@ -631,7 +639,12 @@ export async function registerHandlers(io: Server) {
         if (member.role !== 'KP') throw new Error('只有 KP 可以编辑武器');
         const data = WeaponUpsertSchema.parse(raw);
 
+        // 校验 data.id 真的属于 data.characterId：避免 KP 拿别团武器 id 改别人武器
         if (data.id) {
+          const existing = await prisma.weapon.findUnique({ where: { id: data.id } });
+          if (!existing || existing.characterId !== data.characterId) {
+            throw new Error('武器不存在或不属于该角色');
+          }
           await prisma.weapon.update({
             where: { id: data.id },
             data: {
@@ -667,6 +680,11 @@ export async function registerHandlers(io: Server) {
         const member = await ensureMember(raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以删除武器');
         const data = WeaponDeleteSchema.parse(raw);
+        // 校验武器归属，避免用别人武器 id 删错
+        const existing = await prisma.weapon.findUnique({ where: { id: data.id } });
+        if (!existing || existing.characterId !== data.characterId) {
+          throw new Error('武器不存在或不属于该角色');
+        }
         await prisma.weapon.delete({ where: { id: data.id } });
         await broadcastCharacter(io, raw.sessionId, data.characterId);
       } catch (err) {
@@ -682,6 +700,10 @@ export async function registerHandlers(io: Server) {
         const data = EquipmentUpsertSchema.parse(raw);
 
         if (data.id) {
+          const existing = await prisma.equipment.findUnique({ where: { id: data.id } });
+          if (!existing || existing.characterId !== data.characterId) {
+            throw new Error('物品不存在或不属于该角色');
+          }
           await prisma.equipment.update({
             where: { id: data.id },
             data: {
@@ -711,6 +733,10 @@ export async function registerHandlers(io: Server) {
         const member = await ensureMember(raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以删除物品');
         const data = EquipmentDeleteSchema.parse(raw);
+        const existing = await prisma.equipment.findUnique({ where: { id: data.id } });
+        if (!existing || existing.characterId !== data.characterId) {
+          throw new Error('物品不存在或不属于该角色');
+        }
         await prisma.equipment.delete({ where: { id: data.id } });
         await broadcastCharacter(io, raw.sessionId, data.characterId);
       } catch (err) {

@@ -45,6 +45,7 @@ export default async function EditCharacterPage({ params }: { params: Promise<{ 
           equipment: c.equipment.map((e) => ({ name: e.name, quantity: e.quantity, note: e.note ?? '' })),
           background: c.background ?? '',
           notes: c.notes ?? '',
+          version: c.version,
         }}
       />
     </main>

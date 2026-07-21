@@ -56,6 +56,11 @@ export const CharacterUpdateSchema = CharacterCreateSchema.partial().extend({
   skills: z.array(SkillSchema).max(200).optional(),
   weapons: z.array(WeaponSchema).max(50).optional(),
   equipment: z.array(EquipmentSchema).max(100).optional(),
+  /**
+   * 乐观锁：客户端拿到 character 时记录 version，PATCH 时回带。
+   * 不一致则返回 409，避免多人同时编辑互相覆盖。
+   */
+  version: z.number().int().min(1).optional(),
 });
 
 export type CharacterCreate = z.infer<typeof CharacterCreateSchema>;

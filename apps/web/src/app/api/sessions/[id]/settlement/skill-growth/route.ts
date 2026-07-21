@@ -12,6 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const s = await prisma.session.findUnique({ where: { id } });
     if (!s) return fail(404, 'not_found');
+    if (s.kpId !== user.id) return fail(403, 'forbidden');
     if (s.status !== 'SETTLING') return fail(400, 'not_settling');
 
     rawBody = await req.json();
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (result.succeeded) {
         await prisma.skill.update({
           where: { id: skill.id },
-          data: { value: Math.min(100, skill.value + result.growth) },
+          // 不再硬 cap 100：与 SkillSchema.max(999) 对齐，结算结果不被截断
+          data: { value: Math.min(999, skill.value + result.growth) },
         });
       }
 

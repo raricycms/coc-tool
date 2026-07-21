@@ -183,8 +183,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               characterId: e.characterId,
               characterName: (e.payload as any)?.characterName,
               content: String((e.payload as any)?.content ?? ''),
-              inGameTime: e.inGameTime ?? '08:00',
-              inGameDate: '',
+              inGameTime: (e.payload as any)?.inGameTime ?? e.inGameTime ?? '08:00',
+              inGameDate: (e.payload as any)?.inGameDate ?? '1/1',
             };
             setIcMessages((prev) => prev.some((m) => m.id === ic.id) ? prev : [...prev, ic]);
           }
@@ -360,8 +360,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             characterId: e.characterId,
             characterName: findCharacterName(e.characterId),
             content: String(p.content ?? ''),
-            inGameTime: e.inGameTime ?? '08:00',
-            inGameDate: '',
+            inGameTime: p.inGameTime ?? e.inGameTime ?? '08:00',
+            inGameDate: p.inGameDate ?? '1/1',
           });
         }
       }

@@ -30,14 +30,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (mythos) {
           await tx.skill.update({
             where: { id: mythos.id },
-            data: { value: Math.min(100, mythos.value + g.amount), isMythos: true },
+            // 不再硬 cap 100：与 SkillSchema.max(999) 对齐，高阶神话值不会被截断
+            data: { value: Math.min(999, mythos.value + g.amount), isMythos: true },
           });
         } else {
           await tx.skill.create({
             data: {
               characterId: c.id,
               name: '克苏鲁知识',
-              value: g.amount,
+              value: Math.min(999, g.amount),
               isMythos: true,
             },
           });

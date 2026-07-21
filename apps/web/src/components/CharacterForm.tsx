@@ -16,6 +16,7 @@ type Equipment = { name: string; quantity: number; note?: string };
 
 export type CharacterFormInitial = {
   id?: string;
+  version?: number;
   name?: string;
   gender?: 'male' | 'female' | 'other' | '';
   age?: number;
@@ -130,6 +131,8 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
       name, gender: gender || undefined, age, birthplace, residence,
       nationality, occupation, era, primary, skills, weapons, equipment,
       background, notes,
+      // 编辑时回带 version 走乐观锁；新建时省略
+      ...(editingId && initial?.version !== undefined ? { version: initial.version } : {}),
     };
     const url = editingId ? `/api/characters/${editingId}` : '/api/characters';
     const method = editingId ? 'PATCH' : 'POST';
@@ -261,7 +264,18 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
                   className="input"
                   value={primary[k]}
                   min={1}
-                  onChange={(e) => { setPrimary({ ...primary, [k]: parseInt(e.target.value) || 0 }); clear(`primary.${k}`); }}
+                  max={999}
+                  onChange={(e) => {
+                    // 留空时保留旧值，避免误清零导致服务端 422 + 字段错误看不到
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setPrimary({ ...primary, [k]: 1 });
+                    } else {
+                      const n = parseInt(raw, 10);
+                      setPrimary({ ...primary, [k]: Number.isFinite(n) ? Math.max(1, Math.min(999, n)) : 1 });
+                    }
+                    clear(`primary.${k}`);
+                  }}
                 />
               </FieldError>
             ))}
@@ -414,11 +428,13 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
               </div>
               <div className="flex justify-end">
                 <button type="button" className="btn-primary" onClick={() => {
-                  if (newWeapon.name) {
-                    setWeapons([...weapons, newWeapon]);
-                    setNewWeapon({ name: '', skill: '', damage: '', range: '' });
-                    scrollListToBottom(weaponsListRef);
+                  if (!newWeapon.name.trim() || !newWeapon.skill.trim() || !newWeapon.damage.trim()) {
+                    setError('武器需要名称 / 使用技能 / 伤害表达式');
+                    return;
                   }
+                  setWeapons([...weapons, newWeapon]);
+                  setNewWeapon({ name: '', skill: '', damage: '', range: '' });
+                  scrollListToBottom(weaponsListRef);
                 }}>
                   ＋ 添加武器
                 </button>

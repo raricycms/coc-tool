@@ -14,6 +14,7 @@ interface ClockRuntime {
   inGameTime: string;
   inGameDate: string;
   timer: NodeJS.Timeout | null;
+  lastPersistedAt: number; // 上次落库的真实毫秒时间戳；用于"距上次落库 ≥5s 才写"
 }
 
 const runtime = new Map<string, ClockRuntime>();
@@ -54,6 +55,7 @@ export async function initRuntime(sessionId: string) {
     inGameTime: s.inGameTime ?? '08:00',
     inGameDate: s.inGameDate ?? '1/1',
     timer: null,
+    lastPersistedAt: 0,
   };
   runtime.set(sessionId, r);
   return r;
@@ -67,8 +69,10 @@ function tick(r: ClockRuntime) {
   const { time, date } = formatTime(totalMs);
   r.inGameTime = time;
   r.inGameDate = date;
-  // 注意：tick 只更新内存，每 5s 落库
-  if (Math.floor(Date.now() / 5000) % 5 === 0) {
+  // 每秒 tick，但落库按"距上次落库 ≥ 5s"节流，避免每秒都写 DB。
+  const now = Date.now();
+  if (now - r.lastPersistedAt >= 5_000) {
+    r.lastPersistedAt = now;
     prisma.session.update({
       where: { id: r.sessionId },
       data: { inGameTime: time, inGameDate: date },
@@ -107,6 +111,7 @@ export function pauseClock(sessionId: string) {
   const { time, date } = formatTime(r.inGameMs);
   r.inGameTime = time;
   r.inGameDate = date;
+  r.lastPersistedAt = Date.now();
   prisma.session.update({
     where: { id: sessionId },
     data: { clockRunning: false, inGameTime: time, inGameDate: date },
@@ -139,6 +144,7 @@ export function setTime(sessionId: string, inGameTime: string, inGameDate: strin
   r.inGameMs = parseTime(inGameTime, inGameDate);
   r.inGameTime = inGameTime;
   r.inGameDate = inGameDate;
+  r.lastPersistedAt = Date.now();
   if (r.running) r.baseRealMs = Date.now();
   prisma.session.update({
     where: { id: sessionId },
@@ -153,6 +159,7 @@ export function addTime(sessionId: string, deltaMinutes: number) {
   const { time, date } = formatTime(r.inGameMs);
   r.inGameTime = time;
   r.inGameDate = date;
+  r.lastPersistedAt = Date.now();
   if (r.running) r.baseRealMs = Date.now();
   prisma.session.update({
     where: { id: sessionId },

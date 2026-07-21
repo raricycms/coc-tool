@@ -117,8 +117,7 @@ describe('settlement flow', () => {
     char = await prisma.character.findUnique({ where: { id: charId } });
     expect(char?.status).toBe('RETIRED');
 
-    // 5) 技能成长（PL 自己投）
-    await loginAs(pl.id, pl.username);
+    // 5) 技能成长（修复后仅 KP 可触发；之前接口没鉴权，PL 也能投，已修）
     const skill = await callRoute(settleSkillRoute.POST, {
       url: `http://localhost/api/sessions/${sessionId}/settlement/skill-growth`, method: 'POST',
       body: { growths: [{ characterId: charId, skillName: '侦察' }] },

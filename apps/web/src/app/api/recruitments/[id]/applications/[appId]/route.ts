@@ -15,6 +15,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     rawBody = await req.json();
     const body = ApplicationReviewSchema.parse(rawBody);
+
+    // 校验 application 确实属于本次招募：appId 单独用 PATCH 时可能被传成任意 application id
+    const app = await prisma.application.findUnique({ where: { id: appId } });
+    if (!app || app.recruitmentId !== id) {
+      return fail(404, 'not_found');
+    }
+
     const updated = await prisma.application.update({
       where: { id: appId },
       data: {

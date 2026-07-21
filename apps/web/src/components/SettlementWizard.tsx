@@ -15,6 +15,8 @@ const STEP_LABEL: Record<Step, string> = {
   DONE: '完成',
 };
 
+const STEP_ORDER: Step[] = ['SAN_RECOVERY', 'KNOWLEDGE_GAIN', 'RETIREMENT', 'SKILL_GROWTH', 'DONE'];
+
 interface PC {
   characterId: string;
   characterName: string;
@@ -28,22 +30,54 @@ interface PC {
   retired: boolean;
 }
 
+interface SanRecovery { characterId: string; amount: number }
+interface KnowledgeGain { characterId: string; amount: number }
+interface Retirement { characterId: string; reason: 'dead' | 'asylum' | 'user_request'; note?: string }
+
 interface Props {
   sessionId: string;
   pcs: PC[];
   initialStep: Step | string;
+  initialDrafts?: {
+    sanRecoveries?: SanRecovery[];
+    knowledgeGains?: KnowledgeGain[];
+    retirements?: Retirement[];
+  };
 }
 
-export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
+export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }: Props) {
   const router = useRouter();
   const { get, apply, clear, clearAll } = useFieldErrors();
   const [step, setStep] = useState<Step>((initialStep as Step) ?? 'SAN_RECOVERY');
-  const [sanRecoveries, setSanRecoveries] = useState<Record<string, number>>({});
-  const [knowledgeGains, setKnowledgeGains] = useState<Record<string, number>>({});
-  const [retirements, setRetirements] = useState<Record<string, 'dead' | 'asylum' | 'user_request' | ''>>({});
+  // 从服务端 JSON 草稿回填，刷新页面不会丢
+  const [sanRecoveries, setSanRecoveries] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    for (const r of initialDrafts?.sanRecoveries ?? []) m[r.characterId] = r.amount;
+    return m;
+  });
+  const [knowledgeGains, setKnowledgeGains] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    for (const k of initialDrafts?.knowledgeGains ?? []) m[k.characterId] = k.amount;
+    return m;
+  });
+  const [retirements, setRetirements] = useState<Record<string, 'dead' | 'asylum' | 'user_request' | ''>>(() => {
+    const m: Record<string, 'dead' | 'asylum' | 'user_request' | ''> = {};
+    for (const r of initialDrafts?.retirements ?? []) m[r.characterId] = r.reason;
+    return m;
+  });
   const [skillSelections, setSkillSelections] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const goPrev = () => {
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx > 0) setStep(STEP_ORDER[idx - 1]);
+  };
+  const goNext = () => {
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx >= 0 && idx < STEP_ORDER.length - 1) setStep(STEP_ORDER[idx + 1]);
+  };
+  const stepIdx = STEP_ORDER.indexOf(step);
 
   const submitSan = async () => {
     setLoading(true); setError(null); clearAll();
@@ -119,9 +153,10 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
     for (const [characterId, skills] of Object.entries(skillSelections)) {
       for (const s of skills) growths.push({ characterId, skillName: s });
     }
+    // 没勾选也允许进入 DONE 步；但不再自动 complete，由用户点「完结」按钮确认。
     if (growths.length === 0) {
+      setLoading(false);
       setStep('DONE');
-      submitComplete();
       return;
     }
     const growthBody = { growths };
@@ -143,13 +178,18 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
   };
 
   const submitComplete = async () => {
-    setLoading(true);
-    await fetch(`/api/sessions/${sessionId}/settlement/complete`, { method: 'POST' });
+    setLoading(true); setError(null);
+    const res = await fetch(`/api/sessions/${sessionId}/settlement/complete`, { method: 'POST' });
     setLoading(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      setError(j?.error?.message || '完结失败，请重试');
+      return;
+    }
     router.push('/dashboard');
   };
 
-  const STEPS: Step[] = ['SAN_RECOVERY', 'KNOWLEDGE_GAIN', 'RETIREMENT', 'SKILL_GROWTH', 'DONE'];
+  const STEPS = STEP_ORDER;
 
   return (
     <div className="space-y-6">
@@ -195,7 +235,10 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
               </FieldError>
             </div>
           ))}
-          <button className="btn-primary w-full" onClick={submitSan} disabled={loading}>下一步：神话知识</button>
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1" disabled={loading} onClick={goPrev}>← 上一步</button>
+            <button className="btn-primary flex-1" onClick={submitSan} disabled={loading}>下一步：神话知识</button>
+          </div>
         </section>
       )}
 
@@ -220,7 +263,10 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
               </FieldError>
             </div>
           ))}
-          <button className="btn-primary w-full" onClick={submitKnowledge} disabled={loading}>下一步：角色结局</button>
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1" disabled={loading} onClick={goPrev}>← 上一步</button>
+            <button className="btn-primary flex-1" onClick={submitKnowledge} disabled={loading}>下一步：角色结局</button>
+          </div>
         </section>
       )}
 
@@ -250,7 +296,10 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
               </FieldError>
             </div>
           ))}
-          <button className="btn-primary w-full" onClick={submitRetirements} disabled={loading}>下一步：技能成长</button>
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1" disabled={loading} onClick={goPrev}>← 上一步</button>
+            <button className="btn-primary flex-1" onClick={submitRetirements} disabled={loading}>下一步：技能成长</button>
+          </div>
         </section>
       )}
 
@@ -289,14 +338,17 @@ export function SettlementWizard({ sessionId, pcs, initialStep }: Props) {
               </div>
             </div>
           ))}
-          <button className="btn-primary w-full" onClick={submitSkillGrowth} disabled={loading}>投骰并完成</button>
+          <div className="flex gap-2 pt-1">
+            <button className="btn-ghost flex-1" disabled={loading} onClick={goPrev}>← 上一步</button>
+            <button className="btn-primary flex-1" onClick={submitSkillGrowth} disabled={loading}>投骰并完成</button>
+          </div>
         </section>
       )}
 
       {step === 'DONE' && (
         <section className="card space-y-4 text-center">
           <h2 className="text-xl font-bold text-ink">🎉 结算完成</h2>
-          <p className="text-ink-soft">所有数值已更新。</p>
+          <p className="text-ink-soft">所有数值已更新。完结后将不可再进入结算流程。</p>
           <button className="btn-primary w-full" onClick={submitComplete} disabled={loading}>完结这场跑团</button>
         </section>
       )}

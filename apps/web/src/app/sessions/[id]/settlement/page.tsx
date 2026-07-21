@@ -66,6 +66,25 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
   if (!s) notFound();
   if (s.kpId !== user.id) notFound();
 
+  // 解析 settlement JSON 草稿（每步提交时都会写入），向导挂载时回填到 useState。
+  // 中途刷新页面、换设备重连也能继续上次进度。
+  const parseJsonArray = (raw: string | null | undefined): any[] => {
+    if (!raw) return [];
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  };
+  const initialDrafts = s.settlement
+    ? {
+        sanRecoveries: parseJsonArray(s.settlement.sanRecoveries),
+        knowledgeGains: parseJsonArray(s.settlement.knowledgeGains),
+        retirements: parseJsonArray(s.settlement.retirements),
+      }
+    : undefined;
+
   const isKp = s.kpId === user.id;
 
   const pcs = s.members
@@ -103,6 +122,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
           sessionId={s.id}
           pcs={pcs}
           initialStep={s.settlement?.step ?? 'SAN_RECOVERY'}
+          initialDrafts={initialDrafts}
         />
       )}
     </main>

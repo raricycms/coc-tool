@@ -241,9 +241,11 @@ describe('judgment schema', () => {
 });
 
 describe('settlement schemas', () => {
-  it('SanRecoverySchema: amount [-99, 99]', () => {
+  it('SanRecoverySchema: amount [0, 99]', () => {
+    // SAN 恢复不应传负值：扣减走 SAN check / 神话扣减，不应从这一步走。
     expect(SanRecoverySchema.safeParse({ sanRecoveries: [{ characterId: 'c', amount: 99 }] }).success).toBe(true);
-    expect(SanRecoverySchema.safeParse({ sanRecoveries: [{ characterId: 'c', amount: -50 }] }).success).toBe(true);
+    expect(SanRecoverySchema.safeParse({ sanRecoveries: [{ characterId: 'c', amount: 0 }] }).success).toBe(true);
+    expect(SanRecoverySchema.safeParse({ sanRecoveries: [{ characterId: 'c', amount: -50 }] }).success).toBe(false);
     expect(SanRecoverySchema.safeParse({ sanRecoveries: [{ characterId: 'c', amount: 100 }] }).success).toBe(false);
   });
 

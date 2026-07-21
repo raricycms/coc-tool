@@ -30,6 +30,14 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
     },
   });
   if (!r) notFound();
+  // 私密（link）招募：非 KP / 未报名者看不到
+  if (r.visibility === 'link' && r.kpId !== user.id) {
+    const myAppForVisibility = await prisma.application.findFirst({
+      where: { recruitmentId: id, applicantId: user.id },
+      select: { id: true },
+    });
+    if (!myAppForVisibility) notFound();
+  }
 
   const myApp = await prisma.application.findFirst({
     where: { recruitmentId: id, applicantId: user.id },
@@ -99,7 +107,7 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
         ? {
             id: c.id,
             name: c.name,
-            str: c.str, con: c.siz, siz: c.siz, dex: c.dex,
+            str: c.str, con: c.con, siz: c.siz, dex: c.dex,
             app: c.app, int: c.int, pow: c.pow, edu: c.edu,
             hpCurrent: c.hpCurrent, hpMax: c.hpMax,
             sanCurrent: c.sanCurrent, sanMax: c.sanMax,
