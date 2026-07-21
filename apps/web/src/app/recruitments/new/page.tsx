@@ -17,7 +17,8 @@ export default function NewRecruitmentPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
+  // 提交动作：'publish'（直接 OPEN）或 'draft'（存为 DRAFT，后续 /publish 发布）
+  const submit = async (e: React.FormEvent, mode: 'publish' | 'draft' = 'publish') => {
     e.preventDefault();
     setError(null);
     clearAll();
@@ -30,6 +31,7 @@ export default function NewRecruitmentPage() {
         minPlayers, maxPlayers,
         expectedHours: expectedHours === '' ? undefined : Number(expectedHours),
         visibility: 'public',
+        asDraft: mode === 'draft',
       }),
     });
     setLoading(false);
@@ -38,7 +40,7 @@ export default function NewRecruitmentPage() {
       if (Array.isArray(j.error?.fields) && j.error.fields.length > 0) {
         apply(j.error.fields);
       } else {
-        setError(j.error?.message || '发布失败');
+        setError(j.error?.message || '操作失败');
       }
       return;
     }
@@ -52,7 +54,7 @@ export default function NewRecruitmentPage() {
         <p className="mt-1 text-sm text-ink-soft">把你的剧本介绍给未来的 PL。</p>
       </header>
 
-      <form onSubmit={submit} className="card space-y-5">
+      <form onSubmit={(e) => submit(e, 'publish')} className="card space-y-5">
         <FieldError error={get('title')}>
           <label className="label">标题 <span className="text-bad">*</span></label>
           <input className="input" value={title} onChange={(e) => { setTitle(e.target.value); clear('title'); }} required maxLength={60} placeholder="例：克苏鲁的呼唤 · 黄衣之王 · 都市怪谈" />
@@ -89,7 +91,16 @@ export default function NewRecruitmentPage() {
 
         {error && <p className="error-text">{error}</p>}
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={loading || !title.trim() || !summary.trim()}
+            onClick={(e) => submit(e as any, 'draft')}
+            title="存为草稿，稍后发布"
+          >
+            {loading ? '保存中…' : '保存草稿'}
+          </button>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? '发布中…' : '发布招募'}
           </button>

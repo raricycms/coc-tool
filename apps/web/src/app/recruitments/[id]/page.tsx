@@ -8,6 +8,7 @@ import {
   KpApplicationsSection,
   type KpApplication,
 } from '@/components/KpApplicationsSection';
+import { PublishDraftButton } from '@/components/PublishDraftButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,7 +137,14 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
         <Link href="/recruitments" className="text-sm font-semibold text-macaron-600 hover:underline">
           ← 返回招募列表
         </Link>
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink">{r.title}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-3xl font-extrabold tracking-tight text-ink">{r.title}</h1>
+          {isKp && r.status !== 'FINISHED' && (
+            <Link href={`/recruitments/${r.id}/edit`} className="btn-soft text-sm">
+              ✎ 编辑
+            </Link>
+          )}
+        </div>
         <p className="text-sm text-ink-soft">
           KP @{r.kp.username}
           {isKp && (
@@ -170,7 +178,7 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
         <ApplyButton
           recruitmentId={r.id}
           myCharacters={myCharacters}
-          existing={myApp ? { status: myApp.status, characterId: myApp.characterId } : null}
+          existing={myApp ? { applicationId: myApp.id, status: myApp.status, characterId: myApp.characterId } : null}
         />
       )}
 
@@ -183,6 +191,11 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
           sessionId={r.session?.id ?? null}
           sessionStatus={r.session?.status ?? null}
         />
+      )}
+
+      {/* KP 在 DRAFT 状态下可一键发布 */}
+      {isKp && r.status === 'DRAFT' && (
+        <PublishDraftButton recruitmentId={r.id} />
       )}
     </main>
   );

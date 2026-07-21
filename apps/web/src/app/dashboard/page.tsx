@@ -233,8 +233,10 @@ function sessionStatusLabel(s: string): string {
 
 function recruitmentStatusLabel(s: string): string {
   switch (s) {
+    case 'DRAFT': return '草稿';
     case 'OPEN': return '招募中';
     case 'CLOSED': return '已关闭';
+    case 'FINISHED': return '已开团';
     default: return s;
   }
 }

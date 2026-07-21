@@ -6,7 +6,7 @@
  *   - GET 详情：404
  *   - PATCH：KP 修改、PL 修改被拒
  *   - PATCH：maxPlayers < minPlayers 被拒
- *   - DELETE：关闭招募（不直接 DELETE 行）
+ *   - DELETE：仅 DRAFT/CLOSED 真删；OPEN 状态拒绝 → 走 POST /close
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -18,6 +18,7 @@ import * as registerRoute from '@/app/api/auth/register/route';
 import * as listRoute from '@/app/api/recruitments/route';
 import * as detailRoute from '@/app/api/recruitments/[id]/route';
 import * as postRoute from '@/app/api/recruitments/route';
+import * as closeRoute from '@/app/api/recruitments/[id]/close/route';
 
 async function register(username: string): Promise<{ id: string; username: string }> {
   const c = createCaptcha();
@@ -118,9 +119,40 @@ describe('recruitments extra', () => {
     expect(res.data.error.code).toBe('invalid_input');
   });
 
-  it('DELETE：KP 关闭招募（status → CLOSED）', async () => {
-    const kp = await register('kp-del');
+  it('POST /close：KP 把 OPEN 招募置 CLOSED', async () => {
+    const kp = await register('kp-close');
     const r = await makeRec(kp.id, '关闭');
+    await loginAs(kp.id, kp.username);
+
+    const res = await callRoute(closeRoute.POST, {
+      url: `http://localhost/api/recruitments/${r.id}/close`, method: 'POST',
+    });
+    expect(res.status).toBe(200);
+
+    const after = await prisma.recruitment.findUnique({ where: { id: r.id } });
+    expect(after?.status).toBe('CLOSED');
+  });
+
+  it('DELETE OPEN 状态被拒（须先 POST /close）', async () => {
+    const kp = await register('kp-del-open');
+    const r = await makeRec(kp.id, 'open招募');
+    await loginAs(kp.id, kp.username);
+
+    const res = await callRoute(detailRoute.DELETE, {
+      url: `http://localhost/api/recruitments/${r.id}`, method: 'DELETE',
+    });
+    expect(res.status).toBe(400);
+    expect(res.data.error.code).toBe('cannot_delete_open');
+
+    const after = await prisma.recruitment.findUnique({ where: { id: r.id } });
+    expect(after).not.toBeNull(); // 仍存在
+  });
+
+  it('DELETE CLOSED 状态真删', async () => {
+    const kp = await register('kp-del-closed');
+    const r = await makeRec(kp.id, 'closed招募');
+    // 直接造 CLOSED 状态
+    await prisma.recruitment.update({ where: { id: r.id }, data: { status: 'CLOSED' } });
     await loginAs(kp.id, kp.username);
 
     const res = await callRoute(detailRoute.DELETE, {
@@ -129,7 +161,7 @@ describe('recruitments extra', () => {
     expect(res.status).toBe(200);
 
     const after = await prisma.recruitment.findUnique({ where: { id: r.id } });
-    expect(after?.status).toBe('CLOSED');
+    expect(after).toBeNull();
   });
 
   it('POST：maxPlayers 校验在 refine 上失败 → 400 + 中文 message', async () => {

@@ -143,6 +143,38 @@ describe('settlement flow', () => {
     expect(session?.status).toBe('FINISHED');
   });
 
+  it('非 KP 提交 skill-growth → 403（防回归）', async () => {
+    const kp = await register('kp_skill_auth');
+    const pl = await register('pl_skill_auth');
+    const { sessionId, charId } = await makeSession(kp.id, pl.id);
+    // KP 走前几步把状态推到 SETTLING
+    await loginAs(kp.id, kp.username);
+    await callRoute(settleStartRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement`, method: 'POST',
+    });
+    await callRoute(settleSanRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/san-recovery`, method: 'POST',
+      body: { sanRecoveries: [{ characterId: charId, amount: 0 }] },
+    });
+    await callRoute(settleKnowledgeRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/knowledge`, method: 'POST',
+      body: { knowledgeGains: [{ characterId: charId, amount: 0 }] },
+    });
+    await callRoute(settleRetireRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/retirements`, method: 'POST',
+      body: { retirements: [] },
+    });
+
+    // PL 身份提交 skill-growth：应被拒
+    await loginAs(pl.id, pl.username);
+    const res = await callRoute(settleSkillRoute.POST, {
+      url: `http://localhost/api/sessions/${sessionId}/settlement/skill-growth`, method: 'POST',
+      body: { growths: [{ characterId: charId, skillName: '侦察' }] },
+    });
+    expect(res.status).toBe(403);
+    expect(res.data.error.code).toBe('forbidden');
+  });
+
   it('san recovery is clamped to sanMax', async () => {
     const kp = await register('kp_clamp');
     const pl = await register('pl_clamp');

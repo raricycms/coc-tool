@@ -1,5 +1,25 @@
 import { z } from 'zod';
 
+/**
+ * 招募状态机：
+ *   DRAFT    → 保存但未发布（创建即 OPEN 之前的工作流；当前默认仍直接创建为 OPEN）
+ *   OPEN     → 招募中，可接受报名
+ *   CLOSED   → KP 主动关闭或拒绝完所有报名
+ *   FINISHED → 已开团，对应 Session 已创建
+ *
+ * 与 Session.status 不同（Session 用 RUNNING/PAUSED/SETTLING/FINISHED/ABANDONED）。
+ */
+export const RECRUITMENT_STATUS = ['DRAFT', 'OPEN', 'CLOSED', 'FINISHED'] as const;
+export type RecruitmentStatus = (typeof RECRUITMENT_STATUS)[number];
+
+/** 招募状态显示名（中文） */
+export const RECRUITMENT_STATUS_LABEL: Record<RecruitmentStatus, string> = {
+  DRAFT: '草稿',
+  OPEN: '招募中',
+  CLOSED: '已关闭',
+  FINISHED: '已开团',
+};
+
 const RecruitmentBaseSchema = z.object({
   title: z.string().min(1).max(60),
   summary: z.string().min(1).max(20_000),

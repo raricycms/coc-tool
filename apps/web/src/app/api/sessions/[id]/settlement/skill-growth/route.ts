@@ -71,14 +71,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
     }
 
+    // 把新 results 合并到现有 skillGrowths：按 (characterId+skillName) 去重，
+    // 同 key 的新条目覆盖旧的（避免 KP 双击重发产生重复日志 / 旧 results）。
+    // 同时复用 Settlement 上其他字段不变。
+    const existing = await prisma.settlement.findUnique({ where: { sessionId: id } });
+    const existingArr: any[] = (() => {
+      if (!existing?.skillGrowths) return [];
+      try {
+        const v = JSON.parse(existing.skillGrowths);
+        return Array.isArray(v) ? v : [];
+      } catch {
+        return [];
+      }
+    })();
+    const keyOf = (r: any) => `${r.characterId}::${r.skillName}`;
+    const seen = new Set(results.map(keyOf));
+    const merged = [...results, ...existingArr.filter((r) => !seen.has(keyOf(r)))];
+
     await prisma.settlement.update({
       where: { sessionId: id },
-      data: {
-        skillGrowths: JSON.stringify(results),
-      },
+      data: { skillGrowths: JSON.stringify(merged) },
     });
 
-    return ok({ results });
+    return ok({ results, merged });
   } catch (e) {
     return handleError(e, { root: rawBody ?? undefined });
   }

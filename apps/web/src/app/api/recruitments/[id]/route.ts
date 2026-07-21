@@ -112,13 +112,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!r) return fail(404, 'not_found');
     if (r.kpId !== user.id) return fail(403, 'forbidden');
     if (r.session) {
-      return fail(400, 'session_started', '招募已开团，不能关闭');
+      return fail(400, 'session_started', '已开团，不能删除');
     }
-    await prisma.recruitment.update({
-      where: { id },
-      data: { status: 'CLOSED' },
-    });
-    return ok({ id });
+    // 仅允许删除 DRAFT 或 CLOSED 的招募；OPEN 状态应走 POST /close
+    if (r.status === 'OPEN' || r.status === 'FINISHED') {
+      return fail(400, 'cannot_delete_open', 'OPEN 状态请用 POST /api/recruitments/[id]/close 关闭');
+    }
+    // 级联删除：Application 没 ON DELETE CASCADE 在 prisma 里，但 schema.prisma 已配 cascade；
+    // 真删会一起带掉 applications。
+    await prisma.recruitment.delete({ where: { id } });
+    return ok({ id, deleted: true });
   } catch (e) {
     return handleError(e);
   }

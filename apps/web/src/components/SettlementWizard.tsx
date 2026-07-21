@@ -79,6 +79,17 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
   };
   const stepIdx = STEP_ORDER.indexOf(step);
 
+  // 重置当前 step 的本地草稿（不写库 —— 用户点"提交"才会落库）。
+  // "重置本步"按钮触发：清掉内存里的值。再次提交就会把空数组写到服务端 JSON。
+  const resetCurrentStep = () => {
+    if (!confirm(`确认清空「${STEP_LABEL[step]}」的本步输入？`)) return;
+    if (step === 'SAN_RECOVERY') setSanRecoveries({});
+    else if (step === 'KNOWLEDGE_GAIN') setKnowledgeGains({});
+    else if (step === 'RETIREMENT') setRetirements({});
+    else if (step === 'SKILL_GROWTH') setSkillSelections({});
+    clearAll();
+  };
+
   const submitSan = async () => {
     setLoading(true); setError(null); clearAll();
     const sanBody = {
@@ -216,9 +227,12 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
 
       {step === 'SAN_RECOVERY' && (
         <section className="card space-y-3">
-          <header>
-            <h2 className="text-lg font-bold text-ink">SAN 恢复</h2>
-            <p className="mt-1 text-sm text-ink-soft">每位调查员本次能恢复的 SAN 值。</p>
+          <header className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink">SAN 恢复</h2>
+              <p className="mt-1 text-sm text-ink-soft">每位调查员本次能恢复的 SAN 值。</p>
+            </div>
+            <button type="button" className="btn-ghost text-[11px]" onClick={resetCurrentStep}>清空本步</button>
           </header>
           {pcs.map((pc) => (
             <div key={pc.characterId} className="flex items-center gap-3 border-b border-sky-100 pb-2 last:border-b-0">
@@ -244,9 +258,12 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
 
       {step === 'KNOWLEDGE_GAIN' && (
         <section className="card space-y-3">
-          <header>
-            <h2 className="text-lg font-bold text-ink">神话知识</h2>
-            <p className="mt-1 text-sm text-ink-soft">每获得 1 点神话知识，会自动扣除 1 点 SAN。</p>
+          <header className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink">神话知识</h2>
+              <p className="mt-1 text-sm text-ink-soft">每获得 1 点神话知识，会自动扣除 1 点 SAN。</p>
+            </div>
+            <button type="button" className="btn-ghost text-[11px]" onClick={resetCurrentStep}>清空本步</button>
           </header>
           {pcs.map((pc) => (
             <div key={pc.characterId} className="flex items-center gap-3 border-b border-sky-100 pb-2 last:border-b-0">
@@ -272,9 +289,12 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
 
       {step === 'RETIREMENT' && (
         <section className="card space-y-3">
-          <header>
-            <h2 className="text-lg font-bold text-ink">角色结局</h2>
-            <p className="mt-1 text-sm text-ink-soft">如果谁要离开这个故事，从下拉里选一个结局；没选就是继续跑。</p>
+          <header className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink">角色结局</h2>
+              <p className="mt-1 text-sm text-ink-soft">如果谁要离开这个故事，从下拉里选一个结局；没选就是继续跑。</p>
+            </div>
+            <button type="button" className="btn-ghost text-[11px]" onClick={resetCurrentStep}>清空本步</button>
           </header>
           {pcs.map((pc) => (
             <div key={pc.characterId} className="flex items-center gap-3 border-b border-sky-100 pb-2 last:border-b-0">
@@ -305,9 +325,12 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
 
       {step === 'SKILL_GROWTH' && (
         <section className="card space-y-3">
-          <header>
-            <h2 className="text-lg font-bold text-ink">技能成长</h2>
-            <p className="mt-1 text-sm text-ink-soft">勾选想要尝试成长的技能，没选就跳过。</p>
+          <header className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-ink">技能成长</h2>
+              <p className="mt-1 text-sm text-ink-soft">勾选想要尝试成长的技能，没选就跳过。</p>
+            </div>
+            <button type="button" className="btn-ghost text-[11px]" onClick={resetCurrentStep}>清空本步</button>
           </header>
           {pcs.filter((pc) => !pc.retired).map((pc) => (
             <div key={pc.characterId} className="border-b border-sky-100 pb-3 last:border-b-0">

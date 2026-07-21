@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useFieldErrors } from '@/lib/useFieldErrors';
 import { FieldError } from './FieldError';
+import { WithdrawButton } from './WithdrawButton';
 
 interface Props {
   recruitmentId: string;
   myCharacters: Array<{ id: string; name: string; era: string }>;
-  existing: { status: string; characterId: string } | null;
+  existing: { applicationId: string; status: string; characterId: string } | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -63,9 +64,14 @@ export function ApplyButton({ recruitmentId, myCharacters, existing }: Props) {
     return (
       <div className="card flex items-center justify-between">
         <p className="text-sm text-ink">你已经报名了这场招募</p>
-        <span className="rounded-full bg-macaron-100 px-3 py-1 text-xs font-semibold text-macaron-600">
-          {STATUS_LABEL[existing.status] ?? existing.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-macaron-100 px-3 py-1 text-xs font-semibold text-macaron-600">
+            {STATUS_LABEL[existing.status] ?? existing.status}
+          </span>
+          {existing.status === 'PENDING' && (
+            <WithdrawButton recruitmentId={recruitmentId} applicationId={existing.applicationId} />
+          )}
+        </div>
       </div>
     );
   }

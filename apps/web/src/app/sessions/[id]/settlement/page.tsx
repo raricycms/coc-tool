@@ -2,7 +2,14 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@coc-tools/db';
+import {
+  parseSettlementJson,
+  SanRecoveryItemSchema,
+  KnowledgeGainItemSchema,
+  RetirementItemSchema,
+} from '@coc-tools/shared';
 import { SettlementWizard } from '@/components/SettlementWizard';
+import { ResumeSessionButton } from '@/components/ResumeSessionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,20 +75,12 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
 
   // 解析 settlement JSON 草稿（每步提交时都会写入），向导挂载时回填到 useState。
   // 中途刷新页面、换设备重连也能继续上次进度。
-  const parseJsonArray = (raw: string | null | undefined): any[] => {
-    if (!raw) return [];
-    try {
-      const v = JSON.parse(raw);
-      return Array.isArray(v) ? v : [];
-    } catch {
-      return [];
-    }
-  };
+  // 用 Zod 兜底：旧版本数据 / 损坏 JSON / 字段缺失时该条被丢弃，整体不会崩。
   const initialDrafts = s.settlement
     ? {
-        sanRecoveries: parseJsonArray(s.settlement.sanRecoveries),
-        knowledgeGains: parseJsonArray(s.settlement.knowledgeGains),
-        retirements: parseJsonArray(s.settlement.retirements),
+        sanRecoveries: parseSettlementJson(s.settlement.sanRecoveries, SanRecoveryItemSchema),
+        knowledgeGains: parseSettlementJson(s.settlement.knowledgeGains, KnowledgeGainItemSchema),
+        retirements: parseSettlementJson(s.settlement.retirements, RetirementItemSchema),
       }
     : undefined;
 
@@ -118,12 +117,18 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
       {!isKp ? (
         <p className="text-ink-soft">只有 KP 可以进入结算流程。</p>
       ) : (
-        <SettlementWizard
-          sessionId={s.id}
-          pcs={pcs}
-          initialStep={s.settlement?.step ?? 'SAN_RECOVERY'}
-          initialDrafts={initialDrafts}
-        />
+        <>
+          <SettlementWizard
+            sessionId={s.id}
+            pcs={pcs}
+            initialStep={s.settlement?.step ?? 'SAN_RECOVERY'}
+            initialDrafts={initialDrafts}
+          />
+          {/* 放弃结算：把 status 从 SETTLING 拉回 RUNNING。注意会清空已经填的草稿。 */}
+          <div className="mt-4 flex justify-center">
+            <ResumeSessionButton sessionId={s.id} />
+          </div>
+        </>
       )}
     </main>
   );
