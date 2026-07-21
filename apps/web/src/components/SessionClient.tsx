@@ -569,6 +569,15 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
                   skills: c.skills, sanCurrent: c.san, luck: c.luck,
                 };
               })}
+              allCharacters={members.filter((m) => m.character).map((m) => {
+                const c = m.character!;
+                return {
+                  id: c.id, name: c.name,
+                  str: c.str, con: c.con, siz: c.siz, dex: c.dex,
+                  app: c.app, int: c.int, pow: c.pow, edu: c.edu,
+                  skills: c.skills, sanCurrent: c.san, luck: c.luck,
+                };
+              })}
               onCreate={createJudgment}
             />
           )}

@@ -86,9 +86,9 @@ describe('characters API', () => {
     expect(ch.equipment).toHaveLength(1);
   });
 
-  it('POST 同名技能 → 服务端去重，保留首条', async () => {
-    // Skill 表有 @@unique([characterId, name])；客户端若误传重复 name，
-    // 服务端必须按 name 去重而不是返回 500。
+  it('POST 同名技能 → 返回 400 duplicate_skill（不再静默丢）', async () => {
+    // 修复前：服务端用 dedupeByName 静默保留首条，数据丢失用户无感知。
+    // 修复后：直接 400 提示用户去重，避免静默丢数据。
     const u = await register('char-dup-skill');
     await loginAs(u.id, u.username);
 
@@ -101,20 +101,15 @@ describe('characters API', () => {
         primary: VALID_PRIMARY,
         skills: [
           { name: '侦查', value: 60 },
-          { name: '侦查', value: 80 }, // 同名，后传值更高但应保留首条（60）
+          { name: '侦查', value: 80 }, // 同名
           { name: '聆听', value: 55 },
         ],
         weapons: [],
         equipment: [],
       },
     });
-    expect(res.status).toBe(200);
-    expect(res.data.ok).toBe(true);
-    const ch = res.data.data;
-    const skills = ch.skills as Array<{ name: string; value: number }>;
-    expect(skills).toHaveLength(2);
-    expect(skills.find((s) => s.name === '侦查')?.value).toBe(60);
-    expect(skills.find((s) => s.name === '聆听')?.value).toBe(55);
+    expect(res.status).toBe(400);
+    expect(res.data.error.code).toBe('duplicate_skill');
   });
 
   it('POST 字段超界 → 400 + invalid_input + fields', async () => {
@@ -209,14 +204,13 @@ describe('characters API', () => {
     expect(res3.data.data.skills).toHaveLength(2);
     expect(res3.data.data.skills.find((s: any) => s.name === '侦察')).toBeUndefined();
 
-    // 改 skills 时若同名重复，服务端也应去重（不报 500）
+    // 改 skills 时若同名重复，服务端应直接 400（不再静默丢数据）
     const res4 = await callRoute(characterByIdRoute.PATCH, {
       url: `http://localhost/api/characters/${charId}`, method: 'PATCH',
       body: { skills: [{ name: '神秘学', value: 5 }, { name: '神秘学', value: 25 }] },
     });
-    expect(res4.status).toBe(200);
-    expect(res4.data.data.skills).toHaveLength(1);
-    expect(res4.data.data.skills[0].value).toBe(5);
+    expect(res4.status).toBe(400);
+    expect(res4.data.error.code).toBe('duplicate_skill');
   });
 
   it('DELETE 软删：status=RETIRED, retiredReason=user_request', async () => {

@@ -90,11 +90,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         else if (d.sanMax > existing.sanMax) updateData.sanCurrent = existing.sanCurrent;
       }
       if (body.skills !== undefined) {
+        // 显式检测重名：直接返回 400 避免静默丢数据
+        const skillNameSet = new Set<string>();
+        const dupSkills: string[] = [];
+        for (const s of body.skills) {
+          if (skillNameSet.has(s.name)) dupSkills.push(s.name);
+          skillNameSet.add(s.name);
+        }
+        if (dupSkills.length > 0) {
+          return fail(400, 'duplicate_skill', `技能名重复：${Array.from(new Set(dupSkills)).join('、')}`);
+        }
         // 差量更新：列表里没的删掉，列表里有则 update / create。
-        // Prisma 的 upsert 会要求 `create` 里写 character 关系，比较啰嗦，
-        // 而且 on conflict 路径还会重新指定 characterId。因此手动拆成
-        // update-by-id + create 两步，配合 deleteMany 差量删除。
-        const submitted = dedupeByName(body.skills);
+        const submitted = body.skills;
         const submittedNames = new Set(submitted.map((s) => s.name));
         const existingByName = new Map(existing.skills.map((s) => [s.name, s]));
         skillOps = {

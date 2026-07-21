@@ -31,10 +31,21 @@ export async function POST(req: NextRequest) {
     const age = body.age ?? 25;
     const derived = derive(body.primary as PrimaryStats, age);
 
-    // 同名技能 / 武器 / 装备只保留第一条（Skill 有 @@unique([characterId, name])）
-    const skills = dedupeByName(body.skills);
+    // 显式检测同名技能：直接返回 400 避免静默丢数据。
+    // 客户端应在提交前去重，服务端这里兜底。
+    const skillNames = new Set<string>();
+    const dupSkills: string[] = [];
+    for (const s of body.skills) {
+      if (skillNames.has(s.name)) dupSkills.push(s.name);
+      skillNames.add(s.name);
+    }
+    if (dupSkills.length > 0) {
+      return fail(400, 'duplicate_skill', `技能名重复：${Array.from(new Set(dupSkills)).join('、')}`);
+    }
+    // 武器 / 装备没有唯一约束，仍走 dedupeByName 防 id 冲突
     const weapons = dedupeByName(body.weapons);
     const equipment = dedupeByName(body.equipment);
+    const skills = body.skills;
 
     const character = await prisma.character.create({
       data: {

@@ -109,6 +109,19 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
     }
   };
 
+  // 当前 step 是否满足"下一步"的前置条件：
+  //   step 1：姓名非空
+  //   step 2：九维属性 ≥1 且 ≤999
+  //   step 3 / 4 / 5：可前进（武器/装备的客户端强校验在 step 4 submit 时再处理）
+  const canGoNext = (): boolean => {
+    if (step === 1) return name.trim().length > 0;
+    if (step === 2) {
+      const ks = ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu', 'luck'] as const;
+      return ks.every((k) => primary[k] >= 1 && primary[k] <= 999);
+    }
+    return true;
+  };
+
   // 母语 = EDU（CoC 7e 规则）。当 EDU 变化时同步更新母语技能值。
   useEffect(() => {
     setSkills((prev) =>
@@ -519,7 +532,13 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
           ← 上一步
         </button>
         {step < 5 ? (
-          <button type="button" className="btn-primary" onClick={() => setStep(step + 1)} disabled={step === 1 && !name}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setStep(step + 1)}
+            disabled={!canGoNext()}
+            title={canGoNext() ? undefined : '请先完成本步必填项'}
+          >
             下一步 →
           </button>
         ) : (

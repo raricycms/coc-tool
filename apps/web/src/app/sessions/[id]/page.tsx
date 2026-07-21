@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@coc-tools/db';
 import { SessionClient } from '@/components/SessionClient';
+import { SpectateExitButton } from '@/components/SpectateExitButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const member = session.members.find((m) => m.userId === user.id);
   const role = member?.role ?? 'SPECTATOR';
   const isKp = role === 'KP';
+  const isSpectator = role === 'SPECTATOR';
 
   return (
     <main className="flex min-h-screen flex-col">
@@ -58,6 +60,30 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </header>
+
+      {/* 状态横幅：清晰告诉用户这场团当前阶段，避免在 FINISHED 团里误操作 */}
+      {(session.status === 'SETTLING' || session.status === 'FINISHED' || session.status === 'ABANDONED') && (
+        <div
+          className={`border-b px-4 py-2 text-center text-sm ${
+            session.status === 'FINISHED'
+              ? 'border-ink-soft/30 bg-sky-50 text-ink-soft'
+              : session.status === 'SETTLING'
+                ? 'border-warn/40 bg-warn/10 text-warn'
+                : 'border-bad/40 bg-bad/10 text-bad'
+          }`}
+        >
+          {session.status === 'SETTLING' && '这场跑团正在结算中（只读）。'}
+          {session.status === 'FINISHED' && '这场跑团已完结（只读存档）。'}
+          {session.status === 'ABANDONED' && '这场跑团已被放弃。'}
+        </div>
+      )}
+
+      {/* 旁观者退出按钮：之前一旦进 session 就永远挂在 members 里 */}
+      {isSpectator && session.status !== 'FINISHED' && session.status !== 'ABANDONED' && (
+        <div className="border-b border-sky-200 bg-sky-50 px-4 py-2 text-center">
+          <SpectateExitButton sessionId={session.id} />
+        </div>
+      )}
 
       <SessionClient
         sessionId={session.id}

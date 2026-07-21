@@ -19,15 +19,22 @@ interface CharacterLite {
 interface Props {
   characters: CharacterLite[];
   plCharacters: CharacterLite[];
+  /** 含 KP 自身 PC 的全部角色（用于"全员"判定） */
+  allCharacters?: CharacterLite[];
   onCreate: (payload: any) => void;
 }
 
-export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
+export function JudgmentCreator({ characters, plCharacters, allCharacters, onCreate }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('skill');
   const [targetId, setTargetId] = useState(characters[0]?.id ?? '');
-  const [broadcast, setBroadcast] = useState(false);
+  const [broadcast, setBroadcast] = useState<'none' | 'pl' | 'all'>('none');
   const target = characters.find((c) => c.id === targetId);
+
+  // 群发目标：'pl' = 仅 PL；'all' = 全部含 KP 自身 PC
+  const broadcastPool: CharacterLite[] = broadcast === 'all' && allCharacters
+    ? allCharacters
+    : plCharacters;
   const [skillName, setSkillName] = useState('');
   const [difficulty, setDifficulty] = useState<'regular' | 'hard' | 'extreme'>('regular');
   const [bonusDice, setBonusDice] = useState(0);
@@ -48,7 +55,7 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
   };
 
   const submit = () => {
-    if (!target && !broadcast) return;
+    if (!target && broadcast === 'none') return;
     const payload: any = {
       type: isSan ? 'san' : 'skill',
       skillName,
@@ -58,8 +65,8 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
       scFailureExpr: isSan ? scFailureExpr : undefined,
       note: note || undefined,
     };
-    if (broadcast && plCharacters.length > 0) {
-      payload.targetCharacterIds = plCharacters.map((c) => c.id);
+    if (broadcast !== 'none' && broadcastPool.length > 0) {
+      payload.targetCharacterIds = broadcastPool.map((c) => c.id);
     } else {
       payload.targetCharacterId = target!.id;
     }
@@ -80,25 +87,45 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
       </header>
 
       {plCharacters.length > 1 && (
-        <label className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs text-ink-soft">
-          <input
-            type="checkbox"
-            className="mt-0.5 rounded border-sky-300 text-macaron-300 focus:ring-macaron-300"
-            checked={broadcast}
-            onChange={(e) => setBroadcast(e.target.checked)}
-          />
-          <span>📢 群发给所有 PL（{plCharacters.length} 个角色同时掷骰）</span>
-        </label>
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 text-xs text-ink-soft">
+          <div className="font-semibold text-ink">📢 群发范围</div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 transition ${broadcast === 'none' ? 'border-macaron-300 bg-white text-ink' : 'border-sky-200 bg-white/50 text-ink-soft hover:bg-white'}`}
+              onClick={() => setBroadcast('none')}
+            >
+              单目标
+            </button>
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 transition ${broadcast === 'pl' ? 'border-macaron-300 bg-white text-ink' : 'border-sky-200 bg-white/50 text-ink-soft hover:bg-white'}`}
+              onClick={() => setBroadcast('pl')}
+              disabled={plCharacters.length === 0}
+            >
+              仅 PL（{plCharacters.length}）
+            </button>
+            {allCharacters && allCharacters.length > plCharacters.length && (
+              <button
+                type="button"
+                className={`rounded-full border px-3 py-1 transition ${broadcast === 'all' ? 'border-macaron-300 bg-white text-ink' : 'border-sky-200 bg-white/50 text-ink-soft hover:bg-white'}`}
+                onClick={() => setBroadcast('all')}
+              >
+                含 KP 自身（{allCharacters.length}）
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       <div>
         <label className="label">判定对象</label>
-        <select className="input" value={targetId} onChange={(e) => setTargetId(e.target.value)} disabled={broadcast}>
+        <select className="input" value={targetId} onChange={(e) => setTargetId(e.target.value)} disabled={broadcast !== 'none'}>
           {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        {broadcast && (
+        {broadcast !== 'none' && (
           <p className="mt-1 text-[11px] text-ink-muted">
-            将对 {plCharacters.map((c) => c.name).join('、')} 同时发布。
+            将对 {broadcastPool.map((c) => c.name).join('、')} 同时发布。
           </p>
         )}
       </div>
@@ -181,8 +208,8 @@ export function JudgmentCreator({ characters, plCharacters, onCreate }: Props) {
       </div>
       <div className="flex justify-end gap-2">
         <button className="btn-ghost text-sm" onClick={() => setOpen(false)}>取消</button>
-        <button className="btn-primary text-sm" onClick={submit} disabled={!skillName || (!target && !broadcast)}>
-          {broadcast ? `群发 ${plCharacters.length} 人` : '发布'}
+        <button className="btn-primary text-sm" onClick={submit} disabled={!skillName || (!target && broadcast === 'none')}>
+          {broadcast !== 'none' ? `群发 ${broadcastPool.length} 人` : '发布'}
         </button>
       </div>
     </section>
