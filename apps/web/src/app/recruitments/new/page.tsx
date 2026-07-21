@@ -14,6 +14,7 @@ export default function NewRecruitmentPage() {
   const [minPlayers, setMinPlayers] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(5);
   const [expectedHours, setExpectedHours] = useState<number | ''>('');
+  const [startAt, setStartAt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export default function NewRecruitmentPage() {
         title, summary, scenario: scenario || undefined,
         minPlayers, maxPlayers,
         expectedHours: expectedHours === '' ? undefined : Number(expectedHours),
+        startAt: startAt ? new Date(startAt).toISOString() : undefined,
         visibility: 'public',
       }),
     });
@@ -86,6 +88,17 @@ export default function NewRecruitmentPage() {
               onChange={(e) => { setExpectedHours(e.target.value === '' ? '' : parseInt(e.target.value)); clear('expectedHours'); }} />
           </FieldError>
         </div>
+
+        <FieldError error={get('startAt')}>
+          <label className="label">计划开团时间（可选）</label>
+          <input
+            type="datetime-local"
+            className="input"
+            value={startAt}
+            onChange={(e) => { setStartAt(e.target.value); clear('startAt'); }}
+          />
+          <p className="mt-1 text-[11px] text-ink-muted">PL 报名时可以看到，方便安排时间。</p>
+        </FieldError>
 
         {error && <p className="error-text">{error}</p>}
 
