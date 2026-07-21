@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@coc-tools/db';
 import { ApplyButton } from '@/components/ApplyButton';
+import { ApprovedPLList, type ApprovedPLItem } from '@/components/ApprovedPLList';
 import {
   KpApplicationsSection,
   type KpApplication,
@@ -50,6 +51,37 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
 
   const isKp = r.kpId === user.id;
   const approved = r.applications.filter((a) => a.status === 'APPROVED');
+
+  // PL 视角也能查看其它已通过 PL 的车卡。复用 characterById（之前只 KP 用了），
+  // character 字段与 KpApplication.character 同构，CharacterViewModal 接受即可。
+  const approvedPLItems: ApprovedPLItem[] = approved.map((a) => {
+    const c = characterById.get(a.characterId);
+    return {
+      applicationId: a.id,
+      applicantUsername: a.applicant.username,
+      character: c
+        ? {
+            id: c.id, name: c.name,
+            str: c.str, con: c.con, siz: c.siz, dex: c.dex,
+            app: c.app, int: c.int, pow: c.pow, edu: c.edu,
+            hpCurrent: c.hpCurrent, hpMax: c.hpMax,
+            sanCurrent: c.sanCurrent, sanMax: c.sanMax,
+            mpCurrent: c.mpCurrent, mpMax: c.mpMax,
+            luckCurrent: c.luckCurrent,
+            damageBonus: c.damageBonus,
+            era: c.era, occupation: c.occupation,
+            skills: c.skills.map((s) => ({ name: s.name, value: s.value, isMythos: s.isMythos })),
+            weapons: c.weapons.map((w) => ({
+              id: w.id, name: w.name, skill: w.skill, damage: w.damage,
+              range: w.range, ammo: w.ammo, note: w.note,
+            })),
+            equipment: c.equipment.map((e) => ({
+              id: e.id, name: e.name, quantity: e.quantity, note: e.note,
+            })),
+          }
+        : null,
+    };
+  });
 
   const kpApplications: KpApplication[] = r.applications.map((a) => {
     const c = characterById.get(a.characterId);
@@ -123,17 +155,7 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
 
       <section className="card">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-soft">已通过 PL</h2>
-        {approved.length === 0 ? (
-          <p className="text-sm text-ink-soft">还没有 PL 通过审核。</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {approved.map((a) => (
-              <li key={a.id} className="rounded-full bg-sky-100 px-3 py-1 text-sm text-ink">
-                @{a.applicant.username}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ApprovedPLList items={approvedPLItems} />
       </section>
 
       {!isKp && r.status === 'OPEN' && (
