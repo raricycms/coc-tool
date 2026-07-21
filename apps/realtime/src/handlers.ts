@@ -759,6 +759,29 @@ async function joinRoom(io: Server, s: AuthedSocket, sessionId: string) {
   if (clock) {
     s.emit(SOCKET_EVENTS.CLOCK_STATE, { sessionId, ...clock });
   }
+
+  // 回灌该 session 仍未结算的判定，避免「刷新页面 / 断线重连后看不到既有判定」。
+  // 注意：realtime 端只 push 给刚加入的 socket，不广播给其他成员。
+  // 前端对 JUDGMENT_CREATED 做按 id 去重，所以每次重连不会重复入队。
+  const pendingJudgments = await prisma.judgment.findMany({
+    where: { sessionId, status: 'PENDING' },
+    include: { character: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  for (const j of pendingJudgments) {
+    s.emit(SOCKET_EVENTS.JUDGMENT_CREATED, {
+      id: j.id,
+      characterId: j.characterId,
+      characterName: j.character.name,
+      skillName: j.skillName,
+      difficulty: j.difficulty as 'regular' | 'hard' | 'extreme',
+      bonusDice: j.bonusDice,
+      scSuccessExpr: j.scSuccessExpr ?? undefined,
+      scFailureExpr: j.scFailureExpr ?? undefined,
+      note: j.note ?? undefined,
+      createdAt: j.createdAt.toISOString(),
+    });
+  }
 }
 
 async function ensureMember(sessionId: string, userId: string) {
