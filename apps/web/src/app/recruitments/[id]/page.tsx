@@ -110,25 +110,11 @@ export default async function RecruitmentDetailPage({ params }: { params: Promis
       </header>
 
       <section className="card space-y-4">
-        {r.scenario && (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">剧本</div>
-            <div className="mt-1 text-base font-semibold text-ink">{r.scenario}</div>
-          </div>
-        )}
-        {r.startAt && (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">计划开团时间</div>
-            <div className="mt-1 text-base font-semibold text-ink">{formatStartAt(r.startAt)}</div>
-          </div>
-        )}
-        <div>
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">招募说明</div>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{r.summary}</p>
-        </div>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{r.summary}</p>
         <div className="flex flex-wrap gap-2 text-[11px]">
           <Tag>已通过 PL {approved.length}/{r.maxPlayers}</Tag>
           <Tag>最少 {r.minPlayers} 人</Tag>
+          {r.scenario && <Tag>剧本：{r.scenario}</Tag>}
           {r.expectedHours && <Tag>预计 {r.expectedHours} 小时</Tag>}
           {!isKp && <Tag>{recruitmentStatusLabel(r.status)}</Tag>}
         </div>
@@ -185,13 +171,4 @@ function recruitmentStatusLabel(s: string): string {
     case 'DRAFT': return '草稿';
     default: return s;
   }
-}
-
-/** 把 Date 格式化为「2026/07/21 周一 19:30」这种 zh-CN 形式；服务端组件里用，hydrate 安全。 */
-function formatStartAt(d: Date | string): string {
-  const date = typeof d === 'string' ? new Date(d) : d;
-  const ymd = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(date);
-  const hm = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
-  return `${ymd} ${weekday} ${hm}`;
 }
