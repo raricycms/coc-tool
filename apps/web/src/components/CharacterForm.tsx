@@ -79,6 +79,7 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
     initial?.skills ?? Object.entries(DEFAULT_SKILLS).map(([name, value]) => ({ name, value })),
   );
   const [newSkill, setNewSkill] = useState({ name: '', value: 50 });
+  const [newSkillError, setNewSkillError] = useState<string | null>(null);
   const [weapons, setWeapons] = useState<Weapon[]>(initial?.weapons ?? []);
   const [newWeapon, setNewWeapon] = useState({ name: '', skill: '', damage: '', range: '' });
   const [equipment, setEquipment] = useState<Equipment[]>(initial?.equipment ?? []);
@@ -328,7 +329,13 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
             <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto] sm:items-end">
               <div>
                 <label className="label text-xs">名称</label>
-                <input className="input" placeholder="技能名称" value={newSkill.name} onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })} />
+                <input
+                  className="input"
+                  placeholder="技能名称"
+                  value={newSkill.name}
+                  onChange={(e) => { setNewSkill({ ...newSkill, name: e.target.value }); setNewSkillError(null); }}
+                />
+                {newSkillError && <p className="mt-1 text-xs text-bad">{newSkillError}</p>}
               </div>
               <div>
                 <label className="label text-xs">初始值</label>
@@ -339,11 +346,19 @@ export function CharacterForm({ initial }: { initial?: CharacterFormInitial } = 
                 type="button"
                 className="btn-primary"
                 onClick={() => {
-                  if (newSkill.name) {
-                    setSkills([...skills, newSkill]);
-                    setNewSkill({ name: '', value: 50 });
-                    scrollListToBottom(skillsListRef);
+                  const name = newSkill.name.trim();
+                  if (!name) {
+                    setNewSkillError('请填写技能名');
+                    return;
                   }
+                  if (skills.some((s) => s.name === name)) {
+                    setNewSkillError(`已有「${name}」，请直接修改值`);
+                    return;
+                  }
+                  setSkills([...skills, { ...newSkill, name }]);
+                  setNewSkill({ name: '', value: 50 });
+                  setNewSkillError(null);
+                  scrollListToBottom(skillsListRef);
                 }}
               >
                 ＋ 添加

@@ -4,6 +4,7 @@ import { CharacterUpdateSchema } from '@coc-tools/shared';
 import { derive, type PrimaryStats } from '@coc-tools/coc-rules';
 import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
+import { dedupeByName } from '@/lib/dedupe';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let rawBody: unknown = null;
@@ -75,9 +76,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       if (body.skills !== undefined) {
         updateData.version = { increment: 1 };
+        const skills = dedupeByName(body.skills);
         updateData.skills = {
           deleteMany: {},
-          create: body.skills.map((s) => ({
+          create: skills.map((s) => ({
             name: s.name,
             value: s.value,
             isMythos: s.isMythos ?? false,
@@ -86,9 +88,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         };
       }
       if (body.weapons !== undefined) {
+        const weapons = dedupeByName(body.weapons);
         updateData.weapons = {
           deleteMany: {},
-          create: body.weapons.map((w) => ({
+          create: weapons.map((w) => ({
             name: w.name,
             skill: w.skill,
             damage: w.damage,
@@ -99,9 +102,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         };
       }
       if (body.equipment !== undefined) {
+        const equipment = dedupeByName(body.equipment);
         updateData.equipment = {
           deleteMany: {},
-          create: body.equipment.map((e) => ({
+          create: equipment.map((e) => ({
             name: e.name,
             quantity: e.quantity,
             note: e.note ?? null,

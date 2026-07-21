@@ -86,6 +86,37 @@ describe('characters API', () => {
     expect(ch.equipment).toHaveLength(1);
   });
 
+  it('POST 同名技能 → 服务端去重，保留首条', async () => {
+    // Skill 表有 @@unique([characterId, name])；客户端若误传重复 name，
+    // 服务端必须按 name 去重而不是返回 500。
+    const u = await register('char-dup-skill');
+    await loginAs(u.id, u.username);
+
+    const res = await callRoute(charactersRoute.POST, {
+      url: 'http://localhost/api/characters', method: 'POST',
+      body: {
+        name: '林远',
+        age: 30,
+        era: 'modern',
+        primary: VALID_PRIMARY,
+        skills: [
+          { name: '侦查', value: 60 },
+          { name: '侦查', value: 80 }, // 同名，后传值更高但应保留首条（60）
+          { name: '聆听', value: 55 },
+        ],
+        weapons: [],
+        equipment: [],
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(res.data.ok).toBe(true);
+    const ch = res.data.data;
+    const skills = ch.skills as Array<{ name: string; value: number }>;
+    expect(skills).toHaveLength(2);
+    expect(skills.find((s) => s.name === '侦查')?.value).toBe(60);
+    expect(skills.find((s) => s.name === '聆听')?.value).toBe(55);
+  });
+
   it('POST 字段超界 → 400 + invalid_input + fields', async () => {
     const u = await register('char-bad');
     await loginAs(u.id, u.username);
@@ -177,6 +208,15 @@ describe('characters API', () => {
     expect(res3.status).toBe(200);
     expect(res3.data.data.skills).toHaveLength(2);
     expect(res3.data.data.skills.find((s: any) => s.name === '侦察')).toBeUndefined();
+
+    // 改 skills 时若同名重复，服务端也应去重（不报 500）
+    const res4 = await callRoute(characterByIdRoute.PATCH, {
+      url: `http://localhost/api/characters/${charId}`, method: 'PATCH',
+      body: { skills: [{ name: '神秘学', value: 5 }, { name: '神秘学', value: 25 }] },
+    });
+    expect(res4.status).toBe(200);
+    expect(res4.data.data.skills).toHaveLength(1);
+    expect(res4.data.data.skills[0].value).toBe(5);
   });
 
   it('DELETE 软删：status=RETIRED, retiredReason=user_request', async () => {

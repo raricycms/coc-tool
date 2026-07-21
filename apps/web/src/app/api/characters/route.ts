@@ -4,6 +4,7 @@ import { CharacterCreateSchema } from '@coc-tools/shared';
 import { derive, type PrimaryStats } from '@coc-tools/coc-rules';
 import { ok, fail, handleError } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
+import { dedupeByName } from '@/lib/dedupe';
 
 export async function GET(_req: NextRequest) {
   let rawBody: unknown = null;
@@ -29,6 +30,11 @@ export async function POST(req: NextRequest) {
 
     const age = body.age ?? 25;
     const derived = derive(body.primary as PrimaryStats, age);
+
+    // 同名技能 / 武器 / 装备只保留第一条（Skill 有 @@unique([characterId, name])）
+    const skills = dedupeByName(body.skills);
+    const weapons = dedupeByName(body.weapons);
+    const equipment = dedupeByName(body.equipment);
 
     const character = await prisma.character.create({
       data: {
@@ -63,7 +69,7 @@ export async function POST(req: NextRequest) {
         background: body.background ?? null,
         notes: body.notes ?? null,
         skills: {
-          create: body.skills.map((s) => ({
+          create: skills.map((s) => ({
             name: s.name,
             value: s.value,
             isMythos: s.isMythos ?? false,
@@ -71,7 +77,7 @@ export async function POST(req: NextRequest) {
           })),
         },
         weapons: {
-          create: body.weapons.map((w) => ({
+          create: weapons.map((w) => ({
             name: w.name,
             skill: w.skill,
             damage: w.damage,
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
           })),
         },
         equipment: {
-          create: body.equipment.map((e) => ({
+          create: equipment.map((e) => ({
             name: e.name,
             quantity: e.quantity,
             note: e.note ?? null,
