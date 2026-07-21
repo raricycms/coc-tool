@@ -218,7 +218,7 @@ model Application {
 }
 
 // ───────────────────────────── Session ─────────────────────────────
-// status: SETUP | RUNNING | PAUSED | SETTLING | FINISHED | ABANDONED
+// status: RUNNING | PAUSED | SETTLING | FINISHED | ABANDONED
 
 model Session {
   id            String        @id @default(cuid())
@@ -228,7 +228,7 @@ model Session {
   kp            User          @relation("KPSessions", fields: [kpId], references: [id], onDelete: Cascade)
   title         String
   scenario      String?
-  status        String        @default("SETUP")
+  status        String        @default("RUNNING")
   startedAt     DateTime?
   pausedAt      DateTime?
   finishedAt    DateTime?

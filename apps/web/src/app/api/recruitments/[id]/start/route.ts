@@ -36,7 +36,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           kpId: r.kpId,
           title: r.title,
           scenario: r.scenario,
-          status: 'SETUP',
+          status: 'RUNNING',
           inGameTime: '08:00',
           inGameDate: '1/1',
           clockRunning: false,

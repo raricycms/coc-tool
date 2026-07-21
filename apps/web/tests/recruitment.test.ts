@@ -117,7 +117,7 @@ describe('recruitment flow', () => {
       where: { id: sessionId },
       include: { members: { include: { character: true } } },
     });
-    expect(session?.status).toBe('SETUP');
+    expect(session?.status).toBe('RUNNING');
     expect(session?.members).toHaveLength(2);
     expect(session?.members.find((m) => m.role === 'KP')?.userId).toBe(kp.id);
     expect(session?.members.find((m) => m.role === 'PL')?.userId).toBe(pl1.id);

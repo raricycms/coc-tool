@@ -14,7 +14,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
   // KP 点了「→ 结算」直接进本页等价于点开始：把 Session 切到 SETTLING，
   // 并确保有 Settlement 行。否则下一步 SAN 恢复的接口会判
   // `not_settling` 拒掉，错误信息也不友好。
-  // FINISHED 不允许再进；其它状态（SETUP/RUNNING/PAUSED）一律视为「要结算」。
+  // FINISHED 不允许再进；其它状态（RUNNING/PAUSED）一律视为「要结算」。
   const s0 = await prisma.session.findUnique({
     where: { id },
     select: { id: true, kpId: true, status: true },
