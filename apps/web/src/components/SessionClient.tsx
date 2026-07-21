@@ -195,7 +195,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         });
       });
       s.on(SOCKET_EVENTS.JUDGMENT_CREATED, (j: JudgmentCreatedEvent) => {
-        setPendingJudgments((prev) => [...prev, j]);
+        // realtime 在 session 加入时会把 DB 里所有 PENDING judgments 回灌一次，
+        // 用 id 去重避免重连/刷新页面后重复入队。
+        setPendingJudgments((prev) => prev.some((p) => p.id === j.id) ? prev : [...prev, j]);
       });
       s.on(SOCKET_EVENTS.JUDGMENT_RESULT, (j: JudgmentResultEvent) => {
         setPendingJudgments((prev) => prev.filter((p) => p.id !== j.id));

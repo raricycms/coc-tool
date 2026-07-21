@@ -1,7 +1,9 @@
 'use client';
 
 /**
- * 招募详情页的 KP 管理区块：报名列表 + 审批按钮 + 已通过 PL 的只读车卡查看入口。
+ * 招募详情页的 KP 管理区块：报名列表 + 审批按钮 + PL 车卡查看入口。
+ * 「查看车卡」对所有状态（PENDING / APPROVED / REJECTED / WITHDRAWN）都开放，
+ * 这样 KP 在决定通过前能看到完整车卡，且能对比同一 PL 多次报名时的车卡版本。
  * 之所以拆出 client component：既需要 useState 控制弹窗，又需要 router.refresh() 反映审批结果。
  */
 
@@ -61,7 +63,7 @@ export function KpApplicationsSection({
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-ink">@{a.applicant.username}</span>
                       <StatusTag status={a.status} />
-                      {a.status === 'APPROVED' && a.character && (
+                      {a.character && (
                         <button
                           type="button"
                           className="btn-soft text-[11px]"
