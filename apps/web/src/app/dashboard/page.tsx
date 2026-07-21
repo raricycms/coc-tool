@@ -37,12 +37,14 @@ export default async function DashboardPage() {
       take: 5,
       include: { kp: { select: { username: true } } },
     }),
-    // 可观战的跑团：公开招募 + 当前状态 RUNNING/PAUSED，且本人尚未在此 session 担任 KP/PL/SPECTATOR
+    // 可观战的跑团：公开招募 + 当前状态 RUNNING/PAUSED。
+    // 不再按"我是否已在该 session 担任成员"过滤，因为观战是可重复进入的动作，
+    // realtime 端 joinRoom 会把 SPECTATOR 行落库且没有退出路径，这条筛选曾导致
+    // 观战过的团永远从列表里消失（无法再从 dashboard 入口重新进入）。
     prisma.session.findMany({
       where: {
         status: { in: ['RUNNING', 'PAUSED'] },
         recruitment: { visibility: 'public' },
-        members: { none: { userId: user.id } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 5,
