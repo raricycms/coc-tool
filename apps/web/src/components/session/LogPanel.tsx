@@ -1,7 +1,9 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import type { LogEntryPayload } from '@coc-tools/shared';
+import { HistorySentinel } from './HistorySentinel';
+import { useStickyScroll } from './useStickyScroll';
 
 interface Member {
   userId: string;
@@ -16,6 +18,18 @@ interface Member {
 interface Props {
   logs: LogEntryPayload[];
   members: Member[];
+  history: {
+    initialized: boolean;
+    hasMore: boolean;
+    loading: boolean;
+    error?: string | null;
+    onLoadMore: () => void;
+  };
+  /**
+   * 父组件递增此值时通知 hook 「下一次消息变化是 prepend」，保持 scrollTop 不动。
+   * 与 history.onLoadMore 配套使用：loadMore 前 increment 一次。
+   */
+  prependSignal: number;
 }
 
 const SUCCESS_LABEL: Record<string, string> = {
@@ -35,18 +49,12 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 
 /**
  * 事件日志：默认就是一整列可滚动列表（与聊天一致）。
- *  - 新事件追加在底部，自动滚到底部
- *  - 向上滚动可查看历史；不撑高页面
+ *  - 新事件追加在底部，自动滚到底部（仅在用户原本就贴底时）
+ *  - 顶部有「加载更早的事件」哨兵，调用方传入 history props
  */
-export function LogPanel({ logs, members }: Props) {
+export function LogPanel({ logs, members, history, prependSignal }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-
-  // 新事件进来：滚到底部，让 KP/PL 看到刚发生的事
-  useEffect(() => {
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
-    }
-  }, [logs]);
+  const { onScroll } = useStickyScroll(scrollerRef, [logs.length], prependSignal);
 
   const findChar = (id?: string) => members.find((m) => m.character?.id === id)?.character;
 
@@ -57,7 +65,20 @@ export function LogPanel({ logs, members }: Props) {
           事件日志 · {logs.length}
         </h3>
       </header>
-      <div ref={scrollerRef} className="h-[480px] space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs lg:h-[640px]">
+      <div
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className="h-[480px] space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs lg:h-[640px]"
+      >
+        <HistorySentinel
+          initialized={history.initialized}
+          loading={history.loading}
+          hasMore={history.hasMore}
+          error={history.error ?? null}
+          onLoadMore={history.onLoadMore}
+          label="加载更早的事件"
+          exhaustedLabel="已加载全部事件"
+        />
         {logs.length === 0 ? (
           <p className="py-6 text-center text-ink-muted">暂无</p>
         ) : (

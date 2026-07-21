@@ -50,6 +50,50 @@ interface Props {
   initialMembers: Member[];
 }
 
+/**
+ * 历史拉取通道。
+ *
+ * 历史通道按「realtime 一次请求的 types」划分，而不是按渲染面板划分：
+ *  - 'chat'  一次请求 types=CHAT_LOG_TYPES，返回的 entry 既要灌给 OOCPanel
+ *           也要灌给 ICPanel（listner 内按 type 分流，避免重复请求）。
+ *  - 'logs'  一次请求 types=NON_CHAT_LOG_TYPES，只给 LogPanel。
+ *
+ * 每个通道独立维护：hasMore / loading / error / cursor / prependSignal。
+ */
+type HistoryChannel = 'chat' | 'logs';
+
+interface ChannelState {
+  /** false：还没收到首屏响应；用于在面板顶部渲染「正在加载历史…」状态。 */
+  initialized: boolean;
+  hasMore: boolean;
+  loading: boolean;
+  error: string | null;
+  /** 已加载的最早一条的 createdAt；下次翻页 cursor。 */
+  cursor: string | null;
+  /** 父组件递增 → useStickyScroll 收到信号 → 下次 messages 变化时按 prepend 处理。 */
+  prependSignal: number;
+}
+
+const HISTORY_PAGE_LIMIT = 100; // 必须与 realtime 端 take: 100 保持一致
+
+function newChannelState(): ChannelState {
+  return {
+    initialized: false,
+    hasMore: true,
+    loading: false,
+    error: null,
+    cursor: null,
+    prependSignal: 0,
+  };
+}
+
+/** 按 id 去重并把 newItems prepend 到 prev 之前；newItems 必须按 createdAt 升序。 */
+function prependUnique<T extends { id: string }>(prev: T[], newItems: T[]): T[] {
+  const seen = new Set(prev.map((m) => m.id));
+  const filtered = newItems.filter((m) => !seen.has(m.id));
+  return [...filtered, ...prev];
+}
+
 export function SessionClient({ sessionId, role, currentUserId, initialClock, initialMembers }: Props) {
   const [connected, setConnected] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -66,6 +110,16 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
   const membersRef = useRef<Member[]>(members);
   useEffect(() => { membersRef.current = members; }, [members]);
+
+  // 各通道历史状态。重新挂载 / 切 session 时整体重置。
+  const [history, setHistory] = useState<Record<HistoryChannel, ChannelState>>(() => ({
+    chat: newChannelState(),
+    logs: newChannelState(),
+  }));
+
+  // requestId → 通道；server 端会把 requestId 原样回带，listener 据此分发。
+  // 不放在 state：高频更新不应触发 re-render。
+  const pendingHistoryRef = useRef<Map<string, HistoryChannel>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -86,8 +140,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setConnected(true);
         setConnectError(null);
         s.emit(SOCKET_EVENTS.JOIN_SESSION, { sessionId });
-        s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId, types: Array.from(CHAT_LOG_TYPES) });
-        s.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId, types: NON_CHAT_LOG_TYPES as unknown as string[] });
+        // 首屏拉取：chat / logs 各发一份（每份最多 100 条，server take 硬上限）。
+        fetchHistory(s, 'chat');
+        fetchHistory(s, 'logs');
       };
       onDisconnect = (reason: string) => {
         setConnected(false);
@@ -138,34 +193,42 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         setLogs((prev) => [...prev, e].slice(-500));
       });
 
-      s.on(SOCKET_EVENTS.LOG_HISTORY_RES, ({ entries }: { entries: any[] }) => {
-        const parsed: LogEntryPayload[] = entries.map((e) => ({
+      s.on(SOCKET_EVENTS.LOG_HISTORY_RES, (res: { entries: any[]; requestId?: string }) => {
+        const parsed: LogEntryPayload[] = (res.entries ?? []).map((e) => ({
           ...e,
           payload: typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload,
           realTime: e.realTime,
           createdAt: e.createdAt,
         }));
-        const findUsername = (uid?: string) => membersRef.current.find((m) => m.userId === uid)?.username ?? '';
-        const findCharacterName = (cid?: string) => membersRef.current.find((m) => m.character?.id === cid)?.character?.name;
 
+        // 优先按 requestId 分发到对应通道（首屏 + 翻页都走这里）。
+        const channel = res.requestId ? pendingHistoryRef.current.get(res.requestId) : undefined;
+        if (channel) {
+          pendingHistoryRef.current.delete(res.requestId!);
+          ingestHistoryPage(channel, parsed);
+          return;
+        }
+
+        // 兜底：没有 requestId（极少见，理论上不应发生，因为现在所有请求都带 requestId）。
+        // 行为对齐旧版：把 chat 类灌到 OOC/IC，其余灌到 logs，按首次初始化。
         const oocHist: OOCMessage[] = [];
         const icHist: ICMessage[] = [];
         const logHist: LogEntryPayload[] = [];
-
+        const findUsername = (uid?: string) => membersRef.current.find((m) => m.userId === uid)?.username ?? '';
+        const findCharacterName = (cid?: string) => membersRef.current.find((m) => m.character?.id === cid)?.character?.name;
         for (const e of parsed) {
           if (e.type === 'CHAT_OOC') {
-            const m: OOCMessage = {
+            oocHist.push({
               id: e.id, sessionId,
               authorId: e.authorId ?? '',
               authorUsername: findUsername(e.authorId),
               authorAvatar: null,
               content: String((e.payload as any).content ?? ''),
               realTime: e.realTime,
-            };
-            if (!oocHist.some((x) => x.id === e.id)) oocHist.push(m);
+            });
           } else if (e.type === 'CHAT_IC') {
             const p = e.payload as any;
-            const m: ICMessage = {
+            icHist.push({
               id: e.id, sessionId,
               kind: (p.kind ?? 'dialogue') as 'desc' | 'dialogue',
               authorId: e.authorId ?? '',
@@ -175,26 +238,16 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               content: String(p.content ?? ''),
               inGameTime: e.inGameTime ?? '08:00',
               inGameDate: '',
-            };
-            icHist.push(m);
+            });
           } else {
             logHist.push(e);
           }
         }
-
-        setOocMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          return [...prev, ...oocHist.filter((m) => !seen.has(m.id))];
-        });
-        setIcMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          return [...prev, ...icHist.filter((m) => !seen.has(m.id))];
-        });
-        setLogs((prev) => {
-          const seen = new Set(prev.map((l) => l.id));
-          return [...logHist.filter((l) => !seen.has(l.id)), ...prev].slice(-500);
-        });
+        setOocMessages((prev) => [...prev, ...oocHist]);
+        setIcMessages((prev) => [...prev, ...icHist]);
+        setLogs((prev) => [...logHist, ...prev].slice(-500));
       });
+
       s.on(SOCKET_EVENTS.JUDGMENT_CREATED, (j: JudgmentCreatedEvent) => {
         // realtime 在 session 加入时会把 DB 里所有 PENDING judgments 回灌一次，
         // 用 id 去重避免重连/刷新页面后重复入队。
@@ -234,6 +287,12 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
 
     return () => {
       cancelled = true;
+      pendingHistoryRef.current.clear();
+      // 把两个通道的 loading 重置，避免断线时遗留 spinner。
+      setHistory((h) => ({
+        chat: { ...h.chat, loading: false },
+        logs: { ...h.logs, loading: false },
+      }));
       if (!socket) return;
       if (socket.connected) {
         socket.emit(SOCKET_EVENTS.LEAVE_SESSION, { sessionId });
@@ -253,6 +312,103 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       socket.off(SOCKET_EVENTS.CHARACTER_UPDATED);
     };
   }, [sessionId]);
+
+  /**
+   * 发起一次历史拉取。channels 各自 register 一个 requestId，server 回带后分发。
+   * 必须先 append 到 pendingHistoryRef 再 emit；emit 同步进入 server queue，
+   * server 端 handler 完成后 emit 回 res，listener 解出 channel → ingest。
+   */
+  function fetchHistory(socket: Awaited<ReturnType<typeof getSocket>>, channel: HistoryChannel, before?: string) {
+    const types = channel === 'chat' ? Array.from(CHAT_LOG_TYPES) : (NON_CHAT_LOG_TYPES as unknown as string[]);
+    const requestId = `${channel}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    pendingHistoryRef.current.set(requestId, channel);
+    setHistory((h) => ({
+      ...h,
+      [channel]: { ...h[channel], loading: true, error: null },
+    }));
+    socket.emit(SOCKET_EVENTS.LOG_HISTORY, { sessionId, types, before, requestId });
+  }
+
+  /**
+   * 处理一次历史响应：分流到对应通道的状态 + 渲染数据。
+   * 每次响应后递增 prependSignal，panel 内的 useStickyScroll 据此保持 scrollTop。
+   */
+  function ingestHistoryPage(channel: HistoryChannel, parsed: LogEntryPayload[]) {
+    const findUsername = (uid?: string) => membersRef.current.find((m) => m.userId === uid)?.username ?? '';
+    const findCharacterName = (cid?: string) => membersRef.current.find((m) => m.character?.id === cid)?.character?.name;
+
+    if (channel === 'chat') {
+      const oocNew: OOCMessage[] = [];
+      const icNew: ICMessage[] = [];
+      for (const e of parsed) {
+        if (e.type === 'CHAT_OOC') {
+          oocNew.push({
+            id: e.id, sessionId,
+            authorId: e.authorId ?? '',
+            authorUsername: findUsername(e.authorId),
+            authorAvatar: null,
+            content: String((e.payload as any).content ?? ''),
+            realTime: e.realTime,
+          });
+        } else if (e.type === 'CHAT_IC') {
+          const p = e.payload as any;
+          icNew.push({
+            id: e.id, sessionId,
+            kind: (p.kind ?? 'dialogue') as 'desc' | 'dialogue',
+            authorId: e.authorId ?? '',
+            authorUsername: findUsername(e.authorId),
+            characterId: e.characterId,
+            characterName: findCharacterName(e.characterId),
+            content: String(p.content ?? ''),
+            inGameTime: e.inGameTime ?? '08:00',
+            inGameDate: '',
+          });
+        }
+      }
+      setOocMessages((prev) => prependUnique(prev, oocNew));
+      setIcMessages((prev) => prependUnique(prev, icNew));
+    } else {
+      setLogs((prev) => prependUnique(prev, parsed).slice(-500));
+    }
+
+    // 更新通道状态：cursor / hasMore / prependSignal
+    const oldest = parsed[0]?.createdAt;
+    setHistory((h) => {
+      const cur = h[channel];
+      return {
+        ...h,
+        [channel]: {
+          ...cur,
+          initialized: true,
+          loading: false,
+          error: null,
+          // 返回条数 < take 上限 → 已是最后一页。
+          hasMore: parsed.length >= HISTORY_PAGE_LIMIT,
+          cursor: oldest ?? cur.cursor,
+          prependSignal: cur.prependSignal + 1,
+        },
+      };
+    });
+  }
+
+  const loadMoreOOC = useCallback(() => {
+    const s = socketRef.current;
+    if (!s) return;
+    const cur = history.chat;
+    if (cur.loading || !cur.hasMore || !cur.initialized) return;
+    fetchHistory(s, 'chat', cur.cursor ?? undefined);
+  }, [history.chat]);
+
+  const loadMoreLogs = useCallback(() => {
+    const s = socketRef.current;
+    if (!s) return;
+    const cur = history.logs;
+    if (cur.loading || !cur.hasMore || !cur.initialized) return;
+    fetchHistory(s, 'logs', cur.cursor ?? undefined);
+  }, [history.logs]);
+
+  // IC 与 OOC 共用 'chat' 通道（一次请求按 type 分流给两侧）。
+  const loadMoreIC = loadMoreOOC;
 
   const sendOOC = useCallback((content: string) => {
     socketRef.current?.emit(SOCKET_EVENTS.OOC_SEND, { sessionId, content });
@@ -327,6 +483,28 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     return () => window.removeEventListener('keydown', onKey);
   }, [inspectingCharacterId]);
 
+  const oocHistoryProps = {
+    initialized: history.chat.initialized,
+    hasMore: history.chat.hasMore,
+    loading: history.chat.loading,
+    error: history.chat.error,
+    onLoadMore: loadMoreOOC,
+  };
+  const icHistoryProps = {
+    initialized: history.chat.initialized,
+    hasMore: history.chat.hasMore,
+    loading: history.chat.loading,
+    error: history.chat.error,
+    onLoadMore: loadMoreIC,
+  };
+  const logsHistoryProps = {
+    initialized: history.logs.initialized,
+    hasMore: history.logs.hasMore,
+    loading: history.logs.loading,
+    error: history.logs.error,
+    onLoadMore: loadMoreLogs,
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       {!connected && (
@@ -343,6 +521,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             role={role}
             myCharacterId={me?.characterId}
             myCharacterName={me?.character?.name}
+            history={icHistoryProps}
+            prependSignal={history.chat.prependSignal}
           />
         </div>
 
@@ -352,6 +532,8 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             onSend={sendOOC}
             canSend={true}
             currentUsername={me?.username ?? ''}
+            history={oocHistoryProps}
+            prependSignal={history.chat.prependSignal}
           />
         </div>
 
@@ -399,7 +581,12 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             onRoll={rollJudgment}
             onCancel={cancelJudgment}
           />
-          <LogPanel logs={logs} members={members} />
+          <LogPanel
+            logs={logs}
+            members={members}
+            history={logsHistoryProps}
+            prependSignal={history.logs.prependSignal}
+          />
         </div>
       </div>
 

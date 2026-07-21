@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import type { ICMessage } from '@coc-tools/shared';
+import { HistorySentinel } from './HistorySentinel';
+import { useStickyScroll } from './useStickyScroll';
 
 interface Props {
   messages: ICMessage[];
@@ -9,20 +11,27 @@ interface Props {
   role: 'KP' | 'PL' | 'SPECTATOR';
   myCharacterId?: string;
   myCharacterName?: string;
+  history: {
+    initialized: boolean;
+    hasMore: boolean;
+    loading: boolean;
+    error?: string | null;
+    onLoadMore: () => void;
+  };
+  /**
+   * 父组件递增此值时通知 hook 「下一次消息变化是 prepend」，保持 scrollTop 不动。
+   * 与 history.onLoadMore 配套使用：loadMore 前 increment 一次。
+   */
+  prependSignal: number;
 }
 
-export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName }: Props) {
+export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName, history, prependSignal }: Props) {
   const [input, setInput] = useState('');
   const [kind, setKind] = useState<'desc' | 'dialogue'>(role === 'KP' ? 'desc' : 'dialogue');
   // KP 在「角色发言」模式下可输入任意角色名（用于旁白 NPC）；PL 锁定为自己角色。
   const [characterName, setCharacterName] = useState('');
   const scrollerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollerRef.current) {
-      scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight;
-    }
-  }, [messages]);
+  const { onScroll } = useStickyScroll(scrollerRef, [messages.length], prependSignal);
 
   const send = () => {
     if (!input.trim()) return;
@@ -49,7 +58,18 @@ export function ICPanel({ messages, onSend, role, myCharacterId, myCharacterName
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画内 · IC</h3>
         <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
       </header>
-      <div ref={scrollerRef} className="h-[480px] space-y-2 overflow-y-auto overflow-x-hidden pr-1 text-sm lg:h-[640px]">
+      <div
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className="h-[480px] space-y-2 overflow-y-auto overflow-x-hidden pr-1 text-sm lg:h-[640px]"
+      >
+        <HistorySentinel
+          initialized={history.initialized}
+          loading={history.loading}
+          hasMore={history.hasMore}
+          error={history.error ?? null}
+          onLoadMore={history.onLoadMore}
+        />
         {messages.length === 0 ? (
           <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (

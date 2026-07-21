@@ -96,7 +96,7 @@ export async function registerHandlers(io: Server) {
     // ── log history ──
     s.on(SOCKET_EVENTS.LOG_HISTORY, async (raw: unknown) => {
       try {
-        const { sessionId, before, types } = LogHistoryRequestSchema.parse(raw);
+        const { sessionId, before, types, requestId } = LogHistoryRequestSchema.parse(raw);
         // 必须是 session 成员才能拉历史
         await ensureMember(sessionId, user.userId);
         const where: any = { sessionId };
@@ -107,7 +107,12 @@ export async function registerHandlers(io: Server) {
           orderBy: { createdAt: 'desc' },
           take: 100,
         });
-        s.emit(SOCKET_EVENTS.LOG_HISTORY_RES, { entries: entries.reverse() });
+        // 回传 requestId / before，让客户端把多个并发请求的响应分发到对应的调用方
+        s.emit(SOCKET_EVENTS.LOG_HISTORY_RES, {
+          entries: entries.reverse(),
+          ...(requestId ? { requestId } : {}),
+          ...(before ? { before } : {}),
+        });
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       }
