@@ -777,6 +777,17 @@ async function joinRoom(io: Server, s: AuthedSocket, sessionId: string) {
       },
       include: { user: true, character: true },
     });
+  } else if (member.leftAt && member.role === 'SPECTATOR') {
+    // 观战是可重复进入的动作：「退出观战」只是给行打了 leftAt，行本身留着。
+    // 不在这里清掉的话，重新进入后 ensureMember 会对之后每一个事件抛
+    // 「你已离开此 Session」，presence 也不会把人算回在线名单 —— 表现为
+    // 观战过一次的团就再也进不去了。
+    // 只对 SPECTATOR 生效：KP / PL 的 leftAt 由结算流程写入，不能这样复活。
+    member = await prisma.sessionMember.update({
+      where: { id: member.id },
+      data: { leftAt: null, joinedAt: new Date() },
+      include: { user: true, character: true },
+    });
   }
 
   await initRuntime(sessionId);
