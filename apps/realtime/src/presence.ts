@@ -99,14 +99,28 @@ export function isOnline(sessionId: string, userId: string): boolean {
   return (bySession.get(sessionId)?.get(userId)?.size ?? 0) > 0;
 }
 
+/**
+ * 名单语义分两种，不要混：
+ *
+ * - KP / PL 是「名册」：进了这团就一直在列表里，离线只是灰点，因为「谁是这团的人」
+ *   跟「谁此刻连着」是两件事，KP 需要看到某个玩家掉线了。
+ * - SPECTATOR 没有任何名册意义，在场就是他的全部身份。所以只在真的有 socket 时才出现，
+ *   关掉标签页就直接从列表消失——而不是留一个永久灰点冒充成员。
+ *
+ * 之前两者都按 `leftAt: null` 一视同仁，于是旁观者只有点了「退出观战」（会写 leftAt）
+ * 才会消失；直接关页面的人就永远灰在列表里。
+ */
 export async function buildPresence(sessionId: string): Promise<PresenceUpdate> {
   const members = await prisma.sessionMember.findMany({
     where: { sessionId, leftAt: null },
     include: { user: true, character: true },
   });
+  const visible = members.filter(
+    (m) => m.role !== 'SPECTATOR' || isOnline(sessionId, m.userId),
+  );
   return {
     sessionId,
-    members: members.map((m) => ({
+    members: visible.map((m) => ({
       userId: m.userId,
       username: m.user.username,
       avatar: m.user.avatarUrl,

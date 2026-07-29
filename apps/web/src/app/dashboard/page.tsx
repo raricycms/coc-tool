@@ -50,7 +50,11 @@ export default async function DashboardPage() {
       take: 5,
       include: {
         kp: { select: { username: true } },
-        _count: { select: { members: { where: { leftAt: null } } } },
+        // 只数正式成员：SPECTATOR 行是「谁点进来看过」的痕迹，路过一次也会落库，
+        // 算进人数会让「3 人」变成「17 人」这种毫无意义的数字。
+        _count: {
+          select: { members: { where: { leftAt: null, role: { in: ['KP', 'PL'] } } } },
+        },
       },
     }),
   ]);

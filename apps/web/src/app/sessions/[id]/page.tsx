@@ -3,7 +3,6 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@coc-tools/db';
 import { SessionClient } from '@/components/SessionClient';
-import { SpectateExitButton } from '@/components/SpectateExitButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,10 +77,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {/* 旁观者退出按钮：之前一旦进 session 就永远挂在 members 里 */}
+      {/* 观战不再需要「退出」动作：presence 只在有连接时把旁观者算进名单，
+          离开本页就自动从名单消失。这里只说明这一点并给个返回入口。 */}
       {isSpectator && session.status !== 'FINISHED' && session.status !== 'ABANDONED' && (
-        <div className="border-b border-sky-200 bg-sky-50 px-4 py-2 text-center">
-          <SpectateExitButton sessionId={session.id} />
+        <div className="border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-ink-soft">
+          你正在观战，离开本页即退出观战。
+          <Link href="/dashboard" className="ml-2 font-semibold text-macaron-600 hover:underline">
+            返回概览
+          </Link>
         </div>
       )}
 
@@ -95,7 +98,12 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           running: session.clockRunning,
           rate: session.clockRate,
         }}
-        initialMembers={session.members.map((m) => ({
+        // 首屏名单同样只放名册 + 自己：DB 里的 SPECTATOR 行是历史痕迹，
+        // 若直接铺上去，会在首个 PRESENCE_UPDATE 到达前闪一批灰掉的路人。
+        // 自己要留着，否则 SessionClient 的 me 在这一小段时间里是 undefined。
+        initialMembers={session.members
+          .filter((m) => m.role !== 'SPECTATOR' || m.userId === user.id)
+          .map((m) => ({
           userId: m.userId,
           username: m.user.username,
           avatar: m.user.avatarUrl,

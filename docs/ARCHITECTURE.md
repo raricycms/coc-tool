@@ -181,6 +181,8 @@ lib/                              # auth / captcha / password / rate-limit / ws-
 
 一个 Session = 一个 room `session:{id}`。所有 KP/PL/观战入房收广播；非成员访问 `/sessions/[id]` 自动建 `SPECTATOR` 成员。
 
+名单语义分两种：KP/PL 是**名册**，`leftAt: null` 就一直出现在 `PresenceUpdate` 里，掉线只是灰点；SPECTATOR 没有名册意义，`buildPresence` 只在他当前有 socket 时才把他放进名单，离开本页即从名单消失。所以 SPECTATOR 那行 DB 记录只是「谁看过这团」的痕迹 + `ensureMember` 的权限依据，不参与名单和人数统计（dashboard 的成员数只数 KP/PL）。
+
 Socket.IO 事件常量（`packages/shared/src/events.ts`）：
 
 | 方向 | 事件 |
