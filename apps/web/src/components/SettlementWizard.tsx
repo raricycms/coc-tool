@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { rollExpressionDetailed } from '@coc-tools/coc-rules';
+import type { FieldError } from '@coc-tools/shared';
 import { useFieldErrors, pathToCharacterKey } from '@/lib/useFieldErrors';
-import { FieldError } from './FieldError';
+import { FieldError as FieldErrorView } from './FieldError';
 
 type Step = 'SAN_RECOVERY' | 'KNOWLEDGE_GAIN' | 'RETIREMENT' | 'SKILL_GROWTH' | 'DONE';
 
@@ -50,9 +52,13 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
   const { get, apply, clear, clearAll } = useFieldErrors();
   const [step, setStep] = useState<Step>((initialStep as Step) ?? 'SAN_RECOVERY');
   // 从服务端 JSON 草稿回填，刷新页面不会丢
-  const [sanRecoveries, setSanRecoveries] = useState<Record<string, number>>(() => {
-    const m: Record<string, number> = {};
-    for (const r of initialDrafts?.sanRecoveries ?? []) m[r.characterId] = r.amount;
+  // SAN 恢复输入支持骰子表达式（如 "1d6"），所以这里存原始字符串；
+  // 提交时再调 rollExpressionDetailed 算出合计。
+  const [sanRecoveries, setSanRecoveries] = useState<Record<string, string>>(() => {
+    const m: Record<string, string> = {};
+    for (const r of initialDrafts?.sanRecoveries ?? []) {
+      m[r.characterId] = String(r.amount ?? 0);
+    }
     return m;
   });
   const [knowledgeGains, setKnowledgeGains] = useState<Record<string, number>>(() => {
@@ -92,9 +98,31 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
 
   const submitSan = async () => {
     setLoading(true); setError(null); clearAll();
-    const sanBody = {
-      sanRecoveries: Object.entries(sanRecoveries).map(([characterId, amount]) => ({ characterId, amount })),
-    };
+    // 解析输入：纯整数 → parseInt；含 d → rollExpressionDetailed 求合计。
+    // 两者结果都 clamp 到 [0, 99]，符合服务端 SanRecoverySchema。
+    const parsed: Array<{ characterId: string; amount: number; raw: string }> = [];
+    const fieldErrors: FieldError[] = [];
+    for (const [characterId, raw] of Object.entries(sanRecoveries)) {
+      const trimmed = (raw ?? '').trim();
+      if (!trimmed) {
+        parsed.push({ characterId, amount: 0, raw });
+        continue;
+      }
+      try {
+        const amount = /d/i.test(trimmed)
+          ? Math.max(0, Math.min(99, rollExpressionDetailed(trimmed).total))
+          : Math.max(0, Math.min(99, parseInt(trimmed, 10) || 0));
+        parsed.push({ characterId, amount, raw });
+      } catch {
+        fieldErrors.push({ path: ['amount', characterId], key: `amount:${characterId}`, label: 'SAN 恢复值', message: `无法解析骰子表达式：${trimmed}` });
+      }
+    }
+    if (fieldErrors.length > 0) {
+      setLoading(false);
+      apply(fieldErrors, pathToCharacterKey({ sanRecoveries: parsed.map(({ characterId, amount }) => ({ characterId, amount })) }));
+      return;
+    }
+    const sanBody = { sanRecoveries: parsed.map(({ characterId, amount }) => ({ characterId, amount })) };
     const res = await fetch(`/api/sessions/${sessionId}/settlement/san-recovery`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sanBody),
@@ -234,21 +262,42 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
             </div>
             <button type="button" className="btn-ghost text-[11px]" onClick={resetCurrentStep}>清空本步</button>
           </header>
-          {pcs.map((pc) => (
-            <div key={pc.characterId} className="flex items-center gap-3 border-b border-sky-100 pb-2 last:border-b-0">
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold text-ink">{pc.characterName}</div>
-                <div className="text-xs text-ink-muted">SAN {pc.sanCurrent}/{pc.sanMax}</div>
+          {pcs.map((pc) => {
+            const raw = sanRecoveries[pc.characterId] ?? '';
+            const trimmed = raw.trim();
+            const looksLikeDice = /d/i.test(trimmed);
+            const preview = looksLikeDice
+              ? (() => { try { return rollExpressionDetailed(trimmed).total; } catch { return null; } })()
+              : null;
+            return (
+              <div key={pc.characterId} className="flex items-center gap-3 border-b border-sky-100 pb-2 last:border-b-0">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-ink">{pc.characterName}</div>
+                  <div className="text-xs text-ink-muted">SAN {pc.sanCurrent}/{pc.sanMax}</div>
+                </div>
+                <FieldErrorView error={get(`amount:${pc.characterId}`)}>
+                  <div className="flex flex-col items-end gap-1">
+                    <input
+                      type="text" inputMode="text" className="input w-28 font-mono"
+                      value={raw}
+                      onChange={(e) => {
+                        setSanRecoveries({ ...sanRecoveries, [pc.characterId]: e.target.value });
+                        clear(`amount:${pc.characterId}`);
+                      }}
+                      placeholder="整数 / 1d6"
+                    />
+                    {looksLikeDice && (
+                      <span className="text-[11px] text-ink-muted font-mono">
+                        {preview != null
+                          ? `🎲 → +${Math.max(0, Math.min(99, preview))}`
+                          : '⚠ 表达式无效'}
+                      </span>
+                    )}
+                  </div>
+                </FieldErrorView>
               </div>
-              <FieldError error={get(`amount:${pc.characterId}`)}>
-                <input
-                  type="number" className="input w-24"
-                  value={sanRecoveries[pc.characterId] ?? 0}
-                  onChange={(e) => { setSanRecoveries({ ...sanRecoveries, [pc.characterId]: parseInt(e.target.value) || 0 }); clear(`amount:${pc.characterId}`); }}
-                />
-              </FieldError>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex gap-2 pt-1">
             <button className="btn-ghost flex-1" disabled={loading} onClick={goPrev}>← 上一步</button>
             <button className="btn-primary flex-1" onClick={submitSan} disabled={loading}>下一步：神话知识</button>
@@ -271,13 +320,13 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
                 <div className="truncate font-semibold text-ink">{pc.characterName}</div>
                 <div className="text-xs text-ink-muted">当前神话知识 {pc.mythos}</div>
               </div>
-              <FieldError error={get(`amount:${pc.characterId}`)}>
+              <FieldErrorView error={get(`amount:${pc.characterId}`)}>
                 <input
                   type="number" className="input w-24" min={0} max={20}
                   value={knowledgeGains[pc.characterId] ?? 0}
                   onChange={(e) => { setKnowledgeGains({ ...knowledgeGains, [pc.characterId]: parseInt(e.target.value) || 0 }); clear(`amount:${pc.characterId}`); }}
                 />
-              </FieldError>
+              </FieldErrorView>
             </div>
           ))}
           <div className="flex gap-2 pt-1">
@@ -302,7 +351,7 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
                 <div className="truncate font-semibold text-ink">{pc.characterName}</div>
                 {pc.retired && <div className="text-xs text-bad">已退役</div>}
               </div>
-              <FieldError error={get(`reason:${pc.characterId}`)}>
+              <FieldErrorView error={get(`reason:${pc.characterId}`)}>
                 <select
                   className="input w-44"
                   value={retirements[pc.characterId] ?? ''}
@@ -313,7 +362,7 @@ export function SettlementWizard({ sessionId, pcs, initialStep, initialDrafts }:
                   <option value="asylum">永久疯狂</option>
                   <option value="user_request">主动离开</option>
                 </select>
-              </FieldError>
+              </FieldErrorView>
             </div>
           ))}
           <div className="flex gap-2 pt-1">
