@@ -73,11 +73,26 @@ export async function registerHandlers(io: Server) {
     }
 
     // ── joinRoom ──
+    // 客户端 connect 后会同步 emit `JOIN_SESSION` + `LOG_HISTORY`（首屏拉历史）。
+    // Socket.IO 不保证这两个事件的处理先后——对于第一次进 session 的旁观者，
+    // joinRoom 还没插入 SPECTATOR 行，LOG_HISTORY 就先命中 ensureMember，抛
+    // "你不在此 Session 中"，并把这条抛给 toast 让人一脸懵。
+    // 解决：把 joinRoom 的 promise 挂到 socket.data.pendingJoin 上，所有 handler
+    // 在 ensureMember 之前先 await 它。Promise 只缓存未结算的 join；join 失败的话
+    // 用 catch 把 reject 吞掉转成 undefined，让后续 ensureMember 抛原本的错。
     s.on(SOCKET_EVENTS.JOIN_SESSION, async ({ sessionId }: { sessionId: string }) => {
-      try {
+      const pending = (async () => {
         await joinRoom(io, s, sessionId);
+      })().catch(() => undefined);
+      s.data.pendingJoin ??= new Map();
+      s.data.pendingJoin.set(sessionId, pending);
+      try {
+        await pending;
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
+      } finally {
+        // 结束后清掉，避免后续断开重连后再有 stale promise 阻塞。
+        s.data.pendingJoin?.delete(sessionId);
       }
     });
 
@@ -97,8 +112,8 @@ export async function registerHandlers(io: Server) {
     s.on(SOCKET_EVENTS.LOG_HISTORY, async (raw: unknown) => {
       try {
         const { sessionId, before, types, requestId } = LogHistoryRequestSchema.parse(raw);
-        // 必须是 session 成员才能拉历史
-        await ensureMember(sessionId, user.userId);
+        // ensureMember 内部会先 await pendingJoin，避免首屏 race。
+        await ensureMember(s, sessionId, user.userId);
         const where: any = { sessionId };
         if (before) where.createdAt = { lt: new Date(before) };
         if (types?.length) where.type = { in: types };
@@ -122,7 +137,7 @@ export async function registerHandlers(io: Server) {
     s.on(SOCKET_EVENTS.OOC_SEND, async ({ sessionId, content }: { sessionId: string; content: string }) => {
       try {
         const data = OOCSendSchema.parse({ content });
-        const member = await ensureMember(sessionId, user.userId);
+        const member = await ensureMember(s, sessionId, user.userId);
         const entry = await prisma.logEntry.create({
           data: {
             sessionId,
@@ -151,7 +166,7 @@ export async function registerHandlers(io: Server) {
     s.on(SOCKET_EVENTS.IC_SEND, async (payload: { sessionId: string; kind: 'desc' | 'dialogue'; content: string; characterId?: string; characterName?: string }) => {
       try {
         const data = ICSendSchema.parse(payload);
-        const member = await ensureMember(payload.sessionId, user.userId);
+        const member = await ensureMember(s, payload.sessionId, user.userId);
         if (data.kind === 'desc' && member.role !== 'KP') {
           throw new Error('只有 KP 可以发描述');
         }
@@ -202,7 +217,7 @@ export async function registerHandlers(io: Server) {
     // ── judgment create ──
     s.on(SOCKET_EVENTS.JUDGMENT_CREATE, async (payload: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(payload.sessionId, user.userId);
+        const member = await ensureMember(s, payload.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以发布判定');
 
         const data = JudgmentCreateSchema.parse(payload);
@@ -306,7 +321,7 @@ export async function registerHandlers(io: Server) {
     s.on(SOCKET_EVENTS.JUDGMENT_ROLL, async (payload: { sessionId: string; judgmentId: string }) => {
       try {
         const data = JudgmentRollSchema.parse(payload);
-        const member = await ensureMember(payload.sessionId, user.userId);
+        const member = await ensureMember(s, payload.sessionId, user.userId);
 
         const judgment = await prisma.judgment.findUnique({
           where: { id: data.judgmentId },
@@ -462,7 +477,7 @@ export async function registerHandlers(io: Server) {
     // ── judgment cancel ──
     s.on(SOCKET_EVENTS.JUDGMENT_CANCEL, async ({ sessionId, judgmentId }: { sessionId: string; judgmentId: string }) => {
       try {
-        const member = await ensureMember(sessionId, user.userId);
+        const member = await ensureMember(s, sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以取消判定');
         await prisma.judgment.update({
           where: { id: judgmentId },
@@ -477,7 +492,7 @@ export async function registerHandlers(io: Server) {
     // ── clock control ──
     s.on(SOCKET_EVENTS.CLOCK_CONTROL, async (payload: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(payload.sessionId, user.userId);
+        const member = await ensureMember(s, payload.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以控制时钟');
 
         await initRuntime(payload.sessionId);
@@ -516,7 +531,7 @@ export async function registerHandlers(io: Server) {
     // ── HP change (KP only) ──
     s.on(SOCKET_EVENTS.HP_CHANGE, async ({ sessionId, characterId, delta, reason }: any) => {
       try {
-        const member = await ensureMember(sessionId, user.userId);
+        const member = await ensureMember(s, sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以修改 HP');
         const char = await prisma.character.findUnique({ where: { id: characterId } });
         if (!char) throw new Error('角色不存在');
@@ -548,7 +563,7 @@ export async function registerHandlers(io: Server) {
     // KP 给 PL 一个 1dN（任意 N）扣 HP 骰子：服务端掷骰，把结果作为负 delta 应用。
     s.on(SOCKET_EVENTS.HP_DICE_ROLL, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以掷扣 HP 骰子');
         const data = HpDiceRollSchema.parse(raw);
         const char = await prisma.character.findUnique({ where: { id: data.characterId } });
@@ -602,7 +617,7 @@ export async function registerHandlers(io: Server) {
     // KP 投一个骰子，结果以 DICE_ROLL 日志推给全员；不做任何角色状态变更。
     s.on(SOCKET_EVENTS.DICE_ROLL, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以公开掷骰');
         const data = DiceRollCreateSchema.parse(raw);
 
@@ -635,7 +650,7 @@ export async function registerHandlers(io: Server) {
     // 附带刷新后的完整角色数据，让所有人（KP + 所有 PL）能立刻在车卡弹窗里看到新数据。
     s.on(SOCKET_EVENTS.WEAPON_UPSERT, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以编辑武器');
         const data = WeaponUpsertSchema.parse(raw);
 
@@ -677,7 +692,7 @@ export async function registerHandlers(io: Server) {
 
     s.on(SOCKET_EVENTS.WEAPON_DELETE, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以删除武器');
         const data = WeaponDeleteSchema.parse(raw);
         // 校验武器归属，避免用别人武器 id 删错
@@ -695,7 +710,7 @@ export async function registerHandlers(io: Server) {
     // ── 物品 upsert / delete (KP only) ──
     s.on(SOCKET_EVENTS.EQUIPMENT_UPSERT, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以编辑物品');
         const data = EquipmentUpsertSchema.parse(raw);
 
@@ -730,7 +745,7 @@ export async function registerHandlers(io: Server) {
 
     s.on(SOCKET_EVENTS.EQUIPMENT_DELETE, async (raw: { sessionId: string } & any) => {
       try {
-        const member = await ensureMember(raw.sessionId, user.userId);
+        const member = await ensureMember(s, raw.sessionId, user.userId);
         if (member.role !== 'KP') throw new Error('只有 KP 可以删除物品');
         const data = EquipmentDeleteSchema.parse(raw);
         const existing = await prisma.equipment.findUnique({ where: { id: data.id } });
@@ -826,7 +841,14 @@ async function joinRoom(io: Server, s: AuthedSocket, sessionId: string) {
   }
 }
 
-async function ensureMember(sessionId: string, userId: string) {
+async function ensureMember(s: AuthedSocket, sessionId: string, userId: string) {
+  // 客户端在 connect 后会同步 emit `JOIN_SESSION` + `LOG_HISTORY` 等，
+  // Socket.IO 不保证先后——第一次进 session 的旁观者 joinRoom 还没插入
+  // SPECTATOR 行，下面这行就抛 "你不在此 Session 中"。先 await 在排队的
+  // join，让 ensureMember 真正看到写库后的状态。join 失败时 pendingJoin 会被
+  // reject；下面再去找行就抛 "你不在此 Session 中"，由 handler 抛出原错。
+  const pending = s.data.pendingJoin?.get(sessionId);
+  if (pending) await pending.catch(() => undefined);
   const m = await prisma.sessionMember.findUnique({ where: { sessionId_userId: { sessionId, userId } } });
   if (!m) throw new Error('你不在此 Session 中');
   if (m.leftAt) throw new Error('你已离开此 Session');

@@ -12,6 +12,14 @@ export interface SessionUser {
 export interface AuthedSocket extends Socket {
   data: {
     user: SessionUser;
+    /**
+     * sessionId → 尚未结算的 joinRoom Promise。
+     * 客户端在 connect 后会同步 emit `JOIN_SESSION` + `LOG_HISTORY` 等
+     * 业务事件，Socket.IO 不保证先后——任何需要 SessionMember 行的 handler
+     * 都要先 await 对应的 pending join，否则首次进 session 的旁观者会在
+     * SPECTATOR 行写入前命中 `ensureMember` 的 "你不在此 Session 中"。
+     */
+    pendingJoin?: Map<string, Promise<void>>;
   };
 }
 
