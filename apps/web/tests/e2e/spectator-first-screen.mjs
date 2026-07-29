@@ -98,6 +98,20 @@ async function publishRecruitment(jreq, title) {
   });
 }
 
+async function apply(jreq, recruitmentId, characterId) {
+  return jreq(`/api/recruitments/${recruitmentId}/applications`, {
+    method: 'POST',
+    body: JSON.stringify({ characterId }),
+  });
+}
+
+async function reviewApplication(jreq, recruitmentId, appId, action) {
+  return jreq(`/api/recruitments/${recruitmentId}/applications/${appId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),
+  });
+}
+
 async function start(jreq, recruitmentId) {
   return jreq(`/api/recruitments/${recruitmentId}/start`, { method: 'POST' });
 }
@@ -123,7 +137,8 @@ async function connectSocket(jreq) {
 
 async function main() {
   const ts = Date.now();
-  const kpUser = 'kp_spec_' + ts;
+  const kpUser = 'kp_' + ts;
+  const plUser = 'pl_' + ts;
   const specUser = 'spec_' + ts;
   const password = 'longpassword123';
 
@@ -143,8 +158,31 @@ async function main() {
   if (rec.status !== 200) process.exit(1);
   const recruitmentId = rec.body.data.id;
 
+  // ─── PL 注册 + 申请 + KP 通过 ───
+  // 启动 session 要求至少 1 个 approved 申请人（no_approved_applicants），
+  // 不是装饰作用，跳过这一步 start 会 400。
+  const plJar = makeCookieJar();
+  const plReq = makeClient(plJar);
+  const plReg = await register(plReq, plUser, password);
+  console.log('[4] PL register:', plReg.status, plReg.body?.ok ? 'OK' : plReg.body);
+  if (plReg.status !== 200) process.exit(1);
+
+  const plChar = await createCharacter(plReq, 'PL-PC');
+  console.log('[5] PL create char:', plChar.status, plChar.body?.ok ? 'OK' : plChar.body);
+  if (plChar.status !== 200) process.exit(1);
+  const plCharacterId = plChar.body.data.id;
+
+  const app = await apply(plReq, recruitmentId, plCharacterId);
+  console.log('[6] PL apply:', app.status, app.body?.ok ? 'OK' : app.body);
+  if (app.status !== 200) process.exit(1);
+  const applicationId = app.body.data.id;
+
+  const review = await reviewApplication(kpReq, recruitmentId, applicationId, 'approve');
+  console.log('[7] KP approve:', review.status, review.body?.ok ? 'OK' : review.body);
+  if (review.status !== 200) process.exit(1);
+
   const startRes = await start(kpReq, recruitmentId);
-  console.log('[4] KP start:', startRes.status, startRes.body?.ok ? 'OK' : startRes.body);
+  console.log('[8] KP start:', startRes.status, startRes.body?.ok ? 'OK' : startRes.body);
   if (startRes.status !== 200) process.exit(1);
   const sessionId = startRes.body.data.id;
   console.log('    sessionId:', sessionId);
@@ -153,7 +191,7 @@ async function main() {
   const specJar = makeCookieJar();
   const specReq = makeClient(specJar);
   const specReg = await register(specReq, specUser, password);
-  console.log('[5] spectator register:', specReg.status, specReg.body?.ok ? 'OK' : specReg.body);
+  console.log('[9] spectator register:', specReg.status, specReg.body?.ok ? 'OK' : specReg.body);
   if (specReg.status !== 200) process.exit(1);
 
   // ─── 旁观者连 socket + 立刻同步 emit session:join + log:history ───
