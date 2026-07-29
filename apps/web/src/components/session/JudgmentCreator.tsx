@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PRIMARY_STAT_LABELS, type PrimaryStatKey } from '@coc-tools/coc-rules';
 
 type Tab = 'skill' | 'attribute' | 'san';
@@ -41,6 +41,25 @@ export function JudgmentCreator({ characters, plCharacters, allCharacters, onCre
   const [scSuccessExpr, setScSuccessExpr] = useState('1d3');
   const [scFailureExpr, setScFailureExpr] = useState('1d6');
   const [note, setNote] = useState('');
+
+  // targetId 只在首次 render 取 characters[0]；characters 是 presence 驱动的 state，
+  // 可能晚到或变化，落空时把判定对象拉回第一个合法角色。
+  useEffect(() => {
+    if (characters.length === 0) return;
+    if (!characters.some((c) => c.id === targetId)) setTargetId(characters[0].id);
+  }, [characters, targetId]);
+
+  // 技能 tab 的 skillName 必须是当前判定对象真实拥有的技能。
+  // skillName 初值是空串，而 <select> 视觉上已经显示第一项 —— 用户看到"选好了"，
+  // 但 state 仍是 ''，「发布」按钮的 disabled={!skillName} 让它一开面板就是灰的，
+  // 表现为「KP 无法发布掷骰检定」。切换判定对象后也可能残留上一个角色才有的
+  // 技能名，那样服务端会回「XX 没有技能/属性」。这里统一兜底。
+  useEffect(() => {
+    if (tab !== 'skill') return;
+    const t = characters.find((c) => c.id === targetId);
+    const names = t?.skills.map((s) => s.name) ?? [];
+    if (names.length > 0 && !names.includes(skillName)) setSkillName(names[0]);
+  }, [tab, targetId, characters, skillName]);
 
   if (characters.length === 0) return null;
 
