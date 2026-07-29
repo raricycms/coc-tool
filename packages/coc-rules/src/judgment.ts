@@ -13,7 +13,7 @@
  *   - 5e/6e 的规则略有差异。本实现按 CoC 7e 占位，TODO(规则书) 校准。
  */
 
-import { rollD10, rollDie, type RandomFn } from './dice';
+import { rollDie, type RandomFn } from './dice';
 
 export type SuccessLevel = 'critical' | 'extreme' | 'hard' | 'success' | 'fail' | 'fumble';
 
@@ -69,15 +69,19 @@ export function applyBonusDice(rolls: number[], bonusDice: number): { tens: numb
 }
 
 /**
- * 投一组 d10 用于判定：
- *   - 1 个基础 d10
- *   - |bonusDice| 个额外 d10
+ * 投一组 d100（百分骰）用于判定：
+ *   - 1 个基础 d100
+ *   - |bonusDice| 个额外 d100
+ *
+ * CoC 7e 的 1d100 范围是 [1, 100]；100 = fumble，1 = critical。
+ * 之前误用 `rollD10`（1-10）然后把单个值拆成 tens/unit，结果 final 永远在
+ * [1, 10]，表现为「投五六次都是 10 以内」。直接改投 rollDie(100) 即可。
  */
 export function rollForJudgment(bonusDice: number, random: RandomFn = Math.random): number[] {
   const bd = Math.max(-5, Math.min(5, Math.trunc(bonusDice)));
   const count = 1 + Math.abs(bd);
   const rolls: number[] = [];
-  for (let i = 0; i < count; i++) rolls.push(rollD10(random));
+  for (let i = 0; i < count; i++) rolls.push(rollDie(100, random));
   return rolls;
 }
 
@@ -102,7 +106,7 @@ export function calculateSuccessLevel(
   if (final >= 100) return 'fumble';
 
   // 01 = critical（仅当 skillValue >= 1）
-  if (final === 0 && skillValue >= 1) return 'critical';
+  if (final === 1 && skillValue >= 1) return 'critical';
 
   // 极难成功：final ≤ skillValue / 5
   if (final <= Math.floor(skillValue / 5)) return 'extreme';

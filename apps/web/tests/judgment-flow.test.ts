@@ -60,7 +60,7 @@ describe('judgment business logic', () => {
       skillValue: skill!.value,
       difficulty: 'hard',
       bonusDice: 0,
-      random: () => (25 - 0.5) / 10,  // d10 → 25
+      random: () => (25 - 0.5) / 100,  // 1d100 → 25
     });
     expect(result.rawRolls).toEqual([25]);
     expect(result.final).toBe(25);

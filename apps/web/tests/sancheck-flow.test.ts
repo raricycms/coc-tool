@@ -241,7 +241,7 @@ describe('基础属性判定分发', () => {
       skillValue,
       difficulty: 'regular',
       bonusDice: 0,
-      random: () => (30 - 0.5) / 10,  // d10 → 30
+      random: () => (30 - 0.5) / 100,  // 1d100 → 30
     });
     expect(result.final).toBe(30);
     expect(result.successLevel).toBe('hard');  // 30 <= 60/2
@@ -253,7 +253,7 @@ describe('基础属性判定分发', () => {
       skillValue: 60,
       difficulty: 'regular',
       bonusDice: 0,
-      random: () => (10 - 0.5) / 10,
+      random: () => (10 - 0.5) / 100,
     });
     expect(r.final).toBe(10);
     expect(r.successLevel).toBe('extreme');  // 10 <= 60/5=12

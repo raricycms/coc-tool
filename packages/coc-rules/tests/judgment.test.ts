@@ -10,33 +10,40 @@ import {
 } from '../src/judgment.js';
 
 /**
- * 注入一个受控的随机数序列，让 1d10 严格按顺序返回。
- * next 调用 i 次会返回 idx[i]。
+ * 注入一个受控的随机数序列，让对应面数的骰子严格按顺序返回。
+ *
+ * next 调用 i 次会返回 `values[i % values.length]`，但因为不同面数的骰子
+ * 走 `floor(rng() * sides) + 1`，单一 makeRng 不能同时正确喂 rollDie(100) 和
+ * rollDie(6) 等不同面数。本 helper 只用于测试 rollForJudgment/judge（投 d100）；
+ * SAN 表达式测试各自按 (v-1)/sides 手写。
  */
 function makeRng(values: number[]): () => number {
   let i = 0;
   return () => {
     const v = values[i % values.length];
     i++;
-    // 把 [0, 1) 映射到 d10：[1, 10]
-    // 直接当作 d10 值（1-10）
-    return (v - 1) / 10;  // 让 rollD10 输出 v
+    // 让 rollDie(100) 输出 v（v 在 [1, 100]）
+    return (v - 1) / 100;
   };
 }
 
 describe('judgment', () => {
   describe('rollForJudgment', () => {
-    it('produces 1 d10 for bonusDice=0', () => {
-      const r = rollForJudgment(0, makeRng([3]));
-      expect(r).toEqual([3]);
+    it('produces 1 d100 for bonusDice=0', () => {
+      const r = rollForJudgment(0, makeRng([42]));
+      expect(r).toEqual([42]);
     });
-    it('produces 1+|bonusDice| d10 for non-zero', () => {
-      const r = rollForJudgment(2, makeRng([1, 5, 7]));
-      expect(r).toEqual([1, 5, 7]);
+    it('produces 1+|bonusDice| d100 for non-zero', () => {
+      const r = rollForJudgment(2, makeRng([10, 50, 70]));
+      expect(r).toEqual([10, 50, 70]);
     });
     it('clamps bonusDice to [-5, 5]', () => {
       const r = rollForJudgment(99, makeRng([1, 2, 3, 4, 5, 6]));
       expect(r).toHaveLength(6);
+    });
+    it('fumble: rollDie(100) can output 100', () => {
+      const r = rollForJudgment(0, makeRng([100]));
+      expect(r).toEqual([100]);
     });
   });
 
@@ -53,6 +60,9 @@ describe('judgment', () => {
     it('treats single digit correctly', () => {
       expect(applyBonusDice([5], 0)).toEqual({ tens: 0, unit: 5 });
     });
+    it('fumble: chosen=100 → tens=10, unit=0', () => {
+      expect(applyBonusDice([100], 0)).toEqual({ tens: 10, unit: 0 });
+    });
   });
 
   describe('calculateSuccessLevel', () => {
@@ -61,7 +71,7 @@ describe('judgment', () => {
       { final: 100, skill: 50, difficulty: 'regular', expected: 'fumble' },
 
       // 大成功 (final=0, skill>=1)
-      { final: 0, skill: 50, difficulty: 'regular', expected: 'critical' },
+      { final: 1, skill: 50, difficulty: 'regular', expected: 'critical' },
 
       // 极难成功 (final <= skill/5)
       { final: 5, skill: 50, difficulty: 'regular', expected: 'extreme' },
@@ -95,29 +105,38 @@ describe('judgment', () => {
 
   describe('judge (end-to-end with injected RNG)', () => {
     it('full success path with bonus dice picking min', () => {
-      // bonusDice=1：基础 1d10 + 1 个奖励骰 = 2 个 d10
-      // 投出 [5, 2]，取最小 2
-      const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: 1, random: makeRng([5, 2]) });
-      expect(r.rawRolls).toEqual([5, 2]);
-      expect(r.tens).toBe(0);
-      expect(r.unit).toBe(2);
-      expect(r.final).toBe(2);
-      expect(r.successLevel).toBe('extreme');   // 2 <= 50/5 = 10
+      // bonusDice=1：基础 1d100 + 1 个奖励骰 = 2 个 d100
+      // 投出 [50, 20]，取最小 20（奖励取低）
+      const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: 1, random: makeRng([50, 20]) });
+      expect(r.rawRolls).toEqual([50, 20]);
+      expect(r.tens).toBe(2);
+      expect(r.unit).toBe(0);
+      expect(r.final).toBe(20);
+      expect(r.successLevel).toBe('hard');      // 20 <= 50/2 = 25, hard 区间
     });
 
     it('penalty dice picks max', () => {
-      // 投出 1, 9, 4；bonusDice=-2 时取 max = 9
-      const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: -2, random: makeRng([1, 9, 4]) });
-      expect(r.rawRolls).toEqual([1, 9, 4]);
-      expect(r.final).toBe(9);
-      expect(r.successLevel).toBe('extreme');   // 9 <= 10
+      // 投出 10, 90, 40；bonusDice=-2 时取 max = 90
+      const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: -2, random: makeRng([10, 90, 40]) });
+      expect(r.rawRolls).toEqual([10, 90, 40]);
+      expect(r.final).toBe(90);
+      expect(r.successLevel).toBe('fail');      // 90 > 50
     });
 
-    it('fumble path', () => {
-      // 投出 100
+    it('fumble path: rollDie(100) returns 100', () => {
       const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: 0, random: makeRng([100]) });
       expect(r.final).toBe(100);
+      expect(r.tens).toBe(10);
+      expect(r.unit).toBe(0);
       expect(r.successLevel).toBe('fumble');
+    });
+
+    it('critical path: rollDie(100) returns 1', () => {
+      const r = judge({ skillValue: 50, difficulty: 'regular', bonusDice: 0, random: makeRng([1]) });
+      expect(r.final).toBe(1);
+      expect(r.tens).toBe(0);
+      expect(r.unit).toBe(1);
+      expect(r.successLevel).toBe('critical');
     });
 
     it('rejects invalid skillValue', () => {
@@ -160,9 +179,23 @@ describe('judgment', () => {
    *   - rollD3  = floor(rng *  3) + 1
    */
   describe('calculateSanLossFromExpr', () => {
+    /**
+     * 注入一个让 rollDie(sides) 严格按 values 输出的随机源：
+     *   rollDie(sides, rng) = floor(rng() * sides) + 1 = v
+     *   ⇒ rng() = (v - 1) / sides
+     */
+    function rngFor(values: number[], sides: number): () => number {
+      let i = 0;
+      return () => {
+        const v = values[i % values.length];
+        i++;
+        return (v - 1) / sides;
+      };
+    }
+
     it('passes when final <= sanValue and rolls success expr', () => {
-      // final=35 san=50 → pass；成功 1d3 + makeRng([1])=0 → floor(0*3)+1 = 1
-      const r = calculateSanLossFromExpr(35, 50, '1d3', '1d6', makeRng([1]));
+      // final=35 san=50 → pass；成功 1d3 + rngFor([1], 3) → rollDie(3)=1
+      const r = calculateSanLossFromExpr(35, 50, '1d3', '1d6', rngFor([1], 3));
       expect(r.passed).toBe(true);
       expect(r.loss).toBe(1);
       expect(r.rolls).toEqual([1]);
@@ -170,60 +203,60 @@ describe('judgment', () => {
     });
 
     it('fails when final > sanValue and rolls failure expr', () => {
-      // final=55 san=50 → fail；失败 1d6 + makeRng([4])=0.3 → floor(0.3*6)+1 = 2
-      const r = calculateSanLossFromExpr(55, 50, '1d3', '1d6', makeRng([4]));
+      // final=55 san=50 → fail；失败 1d6 + rngFor([4], 6) → rollDie(6)=4
+      const r = calculateSanLossFromExpr(55, 50, '1d3', '1d6', rngFor([4], 6));
       expect(r.passed).toBe(false);
-      expect(r.loss).toBe(2);
-      expect(r.rolls).toEqual([2]);
+      expect(r.loss).toBe(4);
+      expect(r.rolls).toEqual([4]);
       expect(r.expr).toBe('1d6');
     });
 
     it('final=100 is fumble → always fail', () => {
-      // final=100 san=99 → 自动失败；1d6 + makeRng([5])=0.4 → floor(0.4*6)+1 = 3
-      const r = calculateSanLossFromExpr(100, 99, '1d3', '1d6', makeRng([5]));
+      // final=100 san=99 → 自动失败；1d6 + rngFor([5], 6) → rollDie(6)=5
+      const r = calculateSanLossFromExpr(100, 99, '1d3', '1d6', rngFor([5], 6));
       expect(r.passed).toBe(false);
-      expect(r.loss).toBe(3);
+      expect(r.loss).toBe(5);
       expect(r.expr).toBe('1d6');
     });
 
     it('final=1 is critical → always pass (when san>=1)', () => {
-      // final=1 san=30 → 自动成功；1d3 + makeRng([2])=0.1 → floor(0.1*3)+1 = 1
-      const r = calculateSanLossFromExpr(1, 30, '1d3', '1d6', makeRng([2]));
+      // final=1 san=30 → 自动成功；1d3 + rngFor([2], 3) → rollDie(3)=2
+      const r = calculateSanLossFromExpr(1, 30, '1d3', '1d6', rngFor([2], 3));
       expect(r.passed).toBe(true);
-      expect(r.loss).toBe(1);
+      expect(r.loss).toBe(2);
       expect(r.expr).toBe('1d3');
     });
 
     it('clamps loss to sanValue', () => {
       // sanValue=3 太低，无论骰出几都 clamp 到 3
-      const r = calculateSanLossFromExpr(99, 3, '1d3', '1d6', makeRng([6]));
+      const r = calculateSanLossFromExpr(99, 3, '1d3', '1d6', rngFor([6], 6));
       expect(r.passed).toBe(false);
       expect(r.loss).toBe(3);
     });
 
     it('supports composite expr (1d6+2)', () => {
-      // 失败 1d6+2 + makeRng([4])=0.3 → 1d6 投出 2, +2 = 4
-      const r = calculateSanLossFromExpr(80, 50, '0', '1d6+2', makeRng([4]));
+      // 失败 1d6+2 + rngFor([4], 6) → 1d6 投出 4, +2 = 6
+      const r = calculateSanLossFromExpr(80, 50, '0', '1d6+2', rngFor([4], 6));
       expect(r.passed).toBe(false);
-      expect(r.loss).toBe(4);
-      expect(r.rolls).toEqual([2, 2]);
+      expect(r.loss).toBe(6);
+      expect(r.rolls).toEqual([4, 2]);
     });
 
     it('empty expression → loss 0 (no error)', () => {
-      const r = calculateSanLossFromExpr(35, 50, '', '1d6', makeRng([5]));
+      const r = calculateSanLossFromExpr(35, 50, '', '1d6', rngFor([5], 6));
       expect(r.passed).toBe(true);
       expect(r.loss).toBe(0);
       expect(r.rolls).toEqual([]);
     });
 
     it('zero constant expr → loss 0', () => {
-      const r = calculateSanLossFromExpr(80, 50, '0', '0', makeRng([1]));
+      const r = calculateSanLossFromExpr(80, 50, '0', '0', rngFor([1], 6));
       expect(r.passed).toBe(false);
       expect(r.loss).toBe(0);
     });
 
     it('bad expr → loss 0 (no throw)', () => {
-      const r = calculateSanLossFromExpr(35, 50, 'abc', '1d6', makeRng([3]));
+      const r = calculateSanLossFromExpr(35, 50, 'abc', '1d6', rngFor([3], 6));
       expect(r.passed).toBe(true);
       expect(r.loss).toBe(0);
     });
