@@ -74,20 +74,20 @@ export async function registerHandlers(io: Server) {
 
     // ── joinRoom ──
     // 客户端 connect 后会同步 emit `JOIN_SESSION` + `LOG_HISTORY`（首屏拉历史）。
-    // Socket.IO 不保证这两个事件的处理先后——对于第一次进 session 的旁观者，
+    // Socket.IO 不保证这两个 handler 的执行先后——第一次进 session 的旁观者，
     // joinRoom 还没插入 SPECTATOR 行，LOG_HISTORY 就先命中 ensureMember，抛
-    // "你不在此 Session 中"，并把这条抛给 toast 让人一脸懵。
-    // 解决：把 joinRoom 的 promise 挂到 socket.data.pendingJoin 上，所有 handler
-    // 在 ensureMember 之前先 await 它。Promise 只缓存未结算的 join；join 失败的话
-    // 用 catch 把 reject 吞掉转成 undefined，让后续 ensureMember 抛原本的错。
+    // "你不在此 Session 中"，被前端 toast 抓住让人一脸懵。
+    // 修：把 joinRoom 的 promise 挂到 socket.data.pendingJoin，让所有 handler
+    // 在 ensureMember 之前先 await 它。Promise 保留原始 reject，这里同时负责
+    // 给客户端 emit ERROR 并 finally 清掉 stale promise。
     s.on(SOCKET_EVENTS.JOIN_SESSION, async ({ sessionId }: { sessionId: string }) => {
-      const pending = (async () => {
+      const joinPromise = (async () => {
         await joinRoom(io, s, sessionId);
-      })().catch(() => undefined);
+      })();
       s.data.pendingJoin ??= new Map();
-      s.data.pendingJoin.set(sessionId, pending);
+      s.data.pendingJoin.set(sessionId, joinPromise);
       try {
-        await pending;
+        await joinPromise;
       } catch (err) {
         s.emit(SOCKET_EVENTS.ERROR, { message: formatErrorMessage(err) });
       } finally {
