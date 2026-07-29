@@ -142,6 +142,24 @@ async function start(jreq, recruitmentId) {
   return jreq(`/api/recruitments/${recruitmentId}/start`, { method: 'POST' });
 }
 
+/**
+ * 结算 RUNNING session：先开 settlement，再 complete。
+ * 跳过 SAN_RECOVERY 等 UI 步骤，免得 e2e 也要走完一长串表单。
+ */
+async function settle(jreq, sessionId) {
+  const begin = await jreq(`/api/sessions/${sessionId}/settlement`, { method: 'POST' });
+  if (begin.status !== 200) {
+    console.log('  [settle] start failed:', begin.status, begin.body);
+    return begin;
+  }
+  const done = await jreq(`/api/sessions/${sessionId}/settlement/complete`, { method: 'POST' });
+  if (done.status !== 200) {
+    console.log('  [settle] complete failed:', done.status, done.body);
+    return done;
+  }
+  return done;
+}
+
 async function connectSocket(jreq) {
   const tokenRes = await jreq('/api/auth/ws-token');
   if (tokenRes.status !== 200) throw new Error(`ws-token ${tokenRes.status}`);
@@ -361,6 +379,15 @@ async function main() {
   }
   console.log(`  final values: ${finalValues.join(', ')}`);
   console.log('\n✅ 完整链路 OK：KP 发布判定 → PL 被判定 → KP 投骰 → 双方收到 judgment:result');
+
+  // 清理：把本次 e2e 创建的 session 走到 FINISHED。
+  console.log('\n[cleanup] settling session...');
+  const settled = await settle(kpReq, sessionId);
+  if (settled?.status === 200) {
+    console.log('  ✓ session FINISHED:', sessionId);
+  } else {
+    console.log('  ✗ settlement 失败（不影响上面断言，先放过）');
+  }
   process.exit(0);
 }
 

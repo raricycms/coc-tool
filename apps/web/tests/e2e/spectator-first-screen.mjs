@@ -116,6 +116,29 @@ async function start(jreq, recruitmentId) {
   return jreq(`/api/recruitments/${recruitmentId}/start`, { method: 'POST' });
 }
 
+/**
+ * 结算已 RUNNING 的 session：先开 settlement（RUNNING → SETTLING），
+ * 再 complete（SETTLING → FINISHED）。complete 端点硬要求 status=SETTLING，
+ * 所以两步是顺序的，不能直接跳到 FINISHED。
+ *
+ * e2e 不需要走 SAN_RECOVERY / SKILL_GROWTH / KNOWLEDGE / RETIREMENTS 那一长串
+ * 步骤——那是 KP 真正结束跑的 UI 流程。e2e 只需要让 session 离开 RUNNING 状态，
+ * 避免停在 dashboard「可观战」列表里污染数据。
+ */
+async function settle(jreq, sessionId) {
+  const begin = await jreq(`/api/sessions/${sessionId}/settlement`, { method: 'POST' });
+  if (begin.status !== 200) {
+    console.log('  [settle] start failed:', begin.status, begin.body);
+    return begin;
+  }
+  const done = await jreq(`/api/sessions/${sessionId}/settlement/complete`, { method: 'POST' });
+  if (done.status !== 200) {
+    console.log('  [settle] complete failed:', done.status, done.body);
+    return done;
+  }
+  return done;
+}
+
 async function connectSocket(jreq) {
   const tokenRes = await jreq('/api/auth/ws-token');
   if (tokenRes.status !== 200) throw new Error(`ws-token ${tokenRes.status}`);
@@ -256,6 +279,17 @@ async function main() {
   }
 
   console.log('\n✓ 旁观者首屏未触发 race；log:history:res 正常回灌');
+
+  // ─── 清理：把本次 e2e 创建的 session 走到 FINISHED ───
+  // 不走 SAN_RECOVERY 等 UI 步骤——只为了让 session 离开 RUNNING，
+  // 避免停在 dashboard「可观战」列表里。
+  console.log('\n[cleanup] settling session...');
+  const settled = await settle(kpReq, sessionId);
+  if (settled?.status === 200) {
+    console.log('  ✓ session FINISHED:', sessionId);
+  } else {
+    console.log('  ✗ settlement 失败（不影响上面断言，先放过）');
+  }
   process.exit(0);
 }
 

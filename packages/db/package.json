@@ -16,7 +16,8 @@
     "db:push": "npm run db:setup && node scripts/run-with-env.mjs db push --skip-generate",
     "db:studio": "npm run db:setup && node scripts/run-with-env.mjs studio",
     "db:reset": "npm run db:setup && node scripts/run-with-env.mjs migrate reset --force",
-    "db:migrate-setup": "node scripts/migrate-setup-to-running.mjs"
+    "db:migrate-setup": "node scripts/migrate-setup-to-running.mjs",
+    "db:settle-e2e": "npx tsx scripts/settle-e2e-sessions.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
