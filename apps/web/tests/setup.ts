@@ -13,7 +13,11 @@ const MONOREPO_ROOT = resolve(APP_ROOT, '../..');
 const TEST_DB_PATH = resolve(APP_ROOT, 'test.db');
 const TEST_DB_URL = `file:${TEST_DB_PATH}`;
 const SCHEMA_PATH = resolve(MONOREPO_ROOT, 'packages/db/prisma/schema.prisma');
-const PRISMA_BIN = resolve(MONOREPO_ROOT, 'node_modules/.bin/prisma');
+// node_modules/.bin/prisma 不能直接 spawn：POSIX 上它是无扩展名 shell 脚本，
+// Windows 上对应的 prisma.cmd 在 Node 20+ 不带 shell 会 EINVAL。
+// 该 shim 本身只是 `node ../prisma/build/index.js`，所以直接跑 CLI 入口，
+// 免掉 shell 和扩展名差异。
+const PRISMA_CLI = resolve(MONOREPO_ROOT, 'node_modules/prisma/build/index.js');
 
 // 必须先于其它模块加载：导入时设置 env
 process.env.DATABASE_URL = TEST_DB_URL;
@@ -22,7 +26,8 @@ process.env.NODE_ENV = 'test';
 
 // 推 schema（用 spawnSync 而非 execSync，更可控）
 function pushSchema() {
-  const result = spawnSync(PRISMA_BIN, [
+  const result = spawnSync(process.execPath, [
+    PRISMA_CLI,
     'db', 'push', '--skip-generate', '--accept-data-loss', `--schema=${SCHEMA_PATH}`,
   ], {
     env: { ...process.env, DATABASE_URL: TEST_DB_URL, PATH: process.env.PATH ?? '' },
