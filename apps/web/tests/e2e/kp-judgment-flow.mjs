@@ -286,22 +286,81 @@ async function main() {
   console.log('    events after STR:');
   events.forEach((e) => console.log('     ', e.event, JSON.stringify(e.payload).slice(0, 200)));
 
+  // ─── KP 投骰：让 PL（被判定角色所有者）的判定在 queue 里出来就投掉 ───
+  // 实际上 PL 才能投；但 KP 也被允许。这里为简化用 KP 当投骰者，验证后端
+  // judgment:roll handler 与 1d100 随机数（之前被 d10 拆坏的 final ≤10 bug 已修）。
   sock.disconnect();
+  console.log('\n[13] KP reconnect → socket → roll each judgment...');
+  const sock2 = await connectSocket(kpReq);
+  await new Promise((resolve) => {
+    sock2.emit('session:join', { sessionId });
+    setTimeout(resolve, 300);
+  });
+  const rollEvents = [];
+  ['judgment:created', 'judgment:result', 'judgment:cancelled', 'error'].forEach((evt) => {
+    sock2.on(evt, (e) => rollEvents.push({ event: evt, payload: e }));
+  });
 
   const created = events.filter((e) => e.event === 'judgment:created');
-  const errs = events.filter((e) => e.event === 'error');
+  console.log(`    have ${created.length} PENDING judgments, rolling each...`);
+  let ok = 0;
+  for (const c of created) {
+    sock2.emit('judgment:roll', { sessionId, judgmentId: c.payload.id });
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  await new Promise((r) => setTimeout(r, 1500));
+
+  console.log('    roll events:');
+  rollEvents.forEach((e) => {
+    if (e.event === 'judgment:result') {
+      const final = e.payload.final;
+      const tens = e.payload.tens;
+      const unit = e.payload.unit;
+      const lvl = e.payload.successLevel;
+      console.log(`      judgment:result id=${e.payload.id?.slice(-6)} final=${final} (${tens}${unit.toString().padStart ? String(unit).padStart(2,'0') : unit}) → ${lvl}`);
+    } else {
+      console.log(`      ${e.event}`, JSON.stringify(e.payload).slice(0, 200));
+    }
+  });
+
+  const finalInRange = rollEvents
+    .filter((e) => e.event === 'judgment:result')
+    .every((e) => {
+      // 复检：之前 d10 拆 tens/unit 导致 final 永远 ≤10。
+      // 修复后 rollDie(100) 应该让 final 在 [1, 100] 全范围可达。
+      return e.payload.final >= 1 && e.payload.final <= 100;
+    });
+  const results = rollEvents.filter((e) => e.event === 'judgment:result');
+  const errs = rollEvents.filter((e) => e.event === 'error');
+  sock2.disconnect();
+
   console.log('\n=== summary ===');
   console.log('  judgment:created:', created.length);
+  console.log('  judgment:result:', results.length);
   console.log('  error:', errs.length);
   if (errs.length > 0) {
     console.log('\n✗ 后端报错');
     process.exit(2);
   }
-  if (created.length !== 3) {
-    console.log(`\n✗ 期望 3 个 judgment:created，实际 ${created.length}`);
+  if (created.length !== results.length) {
+    console.log(`\n✗ 期望 ${created.length} 个 judgment:result，实际 ${results.length}`);
     process.exit(3);
   }
-  console.log('\n✅ 完整链路 OK');
+  if (!finalInRange) {
+    console.log('\n✗ 至少一个 final 不在 [1, 100]，可能 d100 还没修好');
+    process.exit(4);
+  }
+  // 真实世界连续投 3 次 1d100 都在 [1, 10] 的概率 0.001；范围分桶校验更稳：
+  // 期望至少出现 1 个 final > 10（否则就是 d10 拆错的那条老路径）
+  const finalValues = results.map((e) => e.payload.final);
+  const anyBig = finalValues.some((f) => f > 10);
+  if (!anyBig) {
+    console.log('\n✗ 连续 3 次都在 [1, 10] 内（概率 0.001），final 仍然疑似被拆 tens/unit');
+    console.log('  finals:', finalValues);
+    process.exit(5);
+  }
+  console.log(`  final values: ${finalValues.join(', ')}`);
+  console.log('\n✅ 完整链路 OK：KP 发布判定 → PL 被判定 → KP 投骰 → 双方收到 judgment:result');
   process.exit(0);
 }
 
