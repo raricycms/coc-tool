@@ -126,8 +126,9 @@ function DiceRollLogLine({ payload }: { payload: any }) {
   const total = payload.diceTotal;
   const description = payload.description ?? '';
   const roller = payload.rolledByUsername ?? '';
+  // 多颗骰时把个体值以「（3+4+2）」追加在合计后，方便看明细；单颗直接 expr=total。
   const rollDetail = rolls.length
-    ? `${expr}=${rolls.join('+')}=${total}`
+    ? `${expr}=${total ?? '?'}（${rolls.join('+')}）`
     : `${expr}=${total ?? '?'}`;
   return (
     <div>
