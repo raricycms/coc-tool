@@ -213,6 +213,55 @@ describe('characters API', () => {
     expect(res4.data.error.code).toBe('duplicate_skill');
   });
 
+  it('PATCH 改 primary：满值角色 current 跟着新 max 满，受伤角色不被治疗，luckCurrent 跟随 luck', async () => {
+    const u = await register('char-sync');
+    await loginAs(u.id, u.username);
+
+    const baseStats = {
+      ownerId: u.id, era: 'modern', ...VALID_PRIMARY,
+      hpMax: 12, mpMax: 10, sanMax: 50, mov: 8, build: 110, damageBonus: '0',
+    };
+
+    // ① 满值角色（车卡阶段）：POW 50 → 70，SAN 应该跟着满，不是卡在 50
+    const full = await prisma.character.create({
+      data: { ...baseStats, name: '满值', hpCurrent: 12, mpCurrent: 10, sanCurrent: 50, luckCurrent: 50 },
+    });
+    const res1 = await callRoute(characterByIdRoute.PATCH, {
+      url: `http://localhost/api/characters/${full.id}`, method: 'PATCH',
+      body: { primary: { ...VALID_PRIMARY, pow: 70, luck: 80 } },
+    });
+    expect(res1.status).toBe(200);
+    expect(res1.data.data.sanMax).toBe(70);
+    expect(res1.data.data.sanCurrent).toBe(70);
+    // 详情页「状态」读 luckCurrent、「属性」读 luck，两处必须一致
+    expect(res1.data.data.luck).toBe(80);
+    expect(res1.data.data.luckCurrent).toBe(80);
+
+    // ② 受伤角色：提升 POW 不能白送 SAN，已消耗的幸运也不回补
+    const hurt = await prisma.character.create({
+      data: { ...baseStats, name: '受伤', hpCurrent: 5, mpCurrent: 10, sanCurrent: 30, luckCurrent: 20 },
+    });
+    const res2 = await callRoute(characterByIdRoute.PATCH, {
+      url: `http://localhost/api/characters/${hurt.id}`, method: 'PATCH',
+      body: { primary: { ...VALID_PRIMARY, pow: 70, luck: 80 } },
+    });
+    expect(res2.status).toBe(200);
+    expect(res2.data.data.sanMax).toBe(70);
+    expect(res2.data.data.sanCurrent).toBe(30);
+    expect(res2.data.data.hpCurrent).toBe(5);
+    expect(res2.data.data.luckCurrent).toBe(20);
+
+    // ③ max 缩小 → current 截断（此时 sanMax 70/sanCurrent 30、luck 80/luckCurrent 20）
+    const res3 = await callRoute(characterByIdRoute.PATCH, {
+      url: `http://localhost/api/characters/${hurt.id}`, method: 'PATCH',
+      body: { primary: { ...VALID_PRIMARY, pow: 25, luck: 10 } },
+    });
+    expect(res3.status).toBe(200);
+    expect(res3.data.data.sanMax).toBe(25);
+    expect(res3.data.data.sanCurrent).toBe(25);
+    expect(res3.data.data.luckCurrent).toBe(10);
+  });
+
   it('DELETE 软删：status=RETIRED, retiredReason=user_request', async () => {
     const u = await register('char-del');
     await loginAs(u.id, u.username);

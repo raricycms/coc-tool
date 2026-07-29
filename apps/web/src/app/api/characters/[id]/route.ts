@@ -79,15 +79,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         updateData.build = d.build;
         updateData.damageBonus = d.damageBonus;
 
-        // 关键修复：max 变化时只 clamp current，不"自动满血"。
-        // max 缩小 → current 截到新 max；max 放大 → current 保持原值（不治疗）。
-        // 没变 → 完全不动。
-        if (d.hpMax < existing.hpMax) updateData.hpCurrent = Math.min(existing.hpCurrent, d.hpMax);
-        else if (d.hpMax > existing.hpMax) updateData.hpCurrent = existing.hpCurrent; // 不治疗
-        if (d.mpMax < existing.mpMax) updateData.mpCurrent = Math.min(existing.mpCurrent, d.mpMax);
-        else if (d.mpMax > existing.mpMax) updateData.mpCurrent = existing.mpCurrent;
-        if (d.sanMax < existing.sanMax) updateData.sanCurrent = Math.min(existing.sanCurrent, d.sanMax);
-        else if (d.sanMax > existing.sanMax) updateData.sanCurrent = existing.sanCurrent;
+        // max 变化时同步 current：
+        //   - 原本是满的（current >= 旧 max）→ 跟着新 max 一起满。车卡阶段反复调 POW
+        //     时 SAN 不该卡在旧值上（"SAN 默认不是满的"）。
+        //   - 受过伤的（current < 旧 max）→ 只 clamp 不治疗：保持原值，
+        //     仅在超过新 max 时截断。
+        const syncCurrent = (cur: number, oldMax: number, newMax: number) =>
+          cur >= oldMax ? newMax : Math.min(cur, newMax);
+        updateData.hpCurrent = syncCurrent(existing.hpCurrent, existing.hpMax, d.hpMax);
+        updateData.mpCurrent = syncCurrent(existing.mpCurrent, existing.mpMax, d.mpMax);
+        updateData.sanCurrent = syncCurrent(existing.sanCurrent, existing.sanMax, d.sanMax);
+        // luck 没有独立的 max 列：luck 本身即上限，luckCurrent 是可消耗值。
+        // 上面的 Object.assign 只写了 luck，luckCurrent 从不更新，导致详情页
+        // 「状态」(luckCurrent) 与「属性」(luck) 两处 LUCK 永久不一致。
+        updateData.luckCurrent = syncCurrent(
+          existing.luckCurrent,
+          existing.luck,
+          body.primary.luck,
+        );
       }
       if (body.skills !== undefined) {
         // 显式检测重名：直接返回 400 避免静默丢数据
