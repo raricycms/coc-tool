@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** 骰子表达式：纯数字（0/3/...）、单骰（1d6）、多骰或带常数（2d6+1 / 1d4+2 / 1d3+1d4 等） */
-const DiceExpr = z.string().regex(/^(\d+d\d+|\d+)([+-](\d+d\d+|\d+))*$/).max(30);
+const DiceExpr = z.string().regex(/^[+-]?(\d+d\d+|\d+)([+-](\d+d\d+|\d+))*$/).max(30);
 
 export const JudgmentCreateSchema = z.object({
   /**

@@ -570,8 +570,9 @@ export async function registerHandlers(io: Server) {
         if (!char) throw new Error('角色不存在');
 
         const roll = rollExpressionDetailed(data.diceExpr);
-        // 扣血按表达式总和取负；表达式可以是治疗（恒为正），但一般 1dN 是扣血。
-        const delta = -Math.abs(roll.total);
+        // 表达式的前导符号决定方向：-1d6 扣血、1d6 / +1d6 加血。
+        // 前端在 HpChangePanel 显示正/负号语义，服务端不再强制取负。
+        const delta = roll.total;
         const hpAfter = Math.max(0, Math.min(char.hpMax, char.hpCurrent + delta));
         await prisma.character.update({
           where: { id: char.id },

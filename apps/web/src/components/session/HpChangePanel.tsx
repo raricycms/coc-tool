@@ -13,7 +13,9 @@ interface Props {
  *  - 默认收起（只露一个按钮），跟「发布判定」一致
  *  - 「变动值」一栏自动识别：
  *      · 纯整数（如 -3）→ 手动扣 / 加血
- *      · 含 d 的表达式（如 1d6、1d6+1d4）→ 走骰子扣血路径
+ *      · 含 d 的表达式（如 1d6、1d6+1d4、-1d6）→ 走骰子扣 / 加血路径
+ *  - 符号约定：负数扣血，正数（默认）/「+」加血。骰子表达式的前缀符号同样生效：
+ *      · `-1d6` 扣 1d6、`1d6` / `+1d6` 加 1d6
  */
 export function HpChangePanel({ characters, onChange, onDice }: Props) {
   const [open, setOpen] = useState(false);
@@ -70,18 +72,18 @@ export function HpChangePanel({ characters, onChange, onDice }: Props) {
         <label className="label">
           变动值
           <span className="ml-2 text-[11px] font-normal text-ink-muted">
-            整数手动 / 含 d 走骰子
+            负数扣血，正数加血
           </span>
         </label>
         <input
           className="input font-mono"
           value={expr}
           onChange={(e) => setExpr(e.target.value)}
-          placeholder="如 -3 或 1d6"
+          placeholder="如 1d6 / -3（负数扣血）"
         />
         <p className="mt-1 text-[11px] text-ink-muted">
           {looksLikeDice
-            ? `🎲 将对 ${expr} 掷骰，按结果扣 / 加血`
+            ? `🎲 将对 ${expr} 掷骰，按结果扣 / 加血（负数扣血）`
             : '✍️ 按输入整数扣 / 加血（负数扣血）'}
         </p>
       </div>

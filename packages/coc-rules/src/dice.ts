@@ -28,25 +28,38 @@ export function rollD10(rand: RandomFn = defaultRandom): number {
 
 /**
  * 解析骰子表达式：
- *   "1d10"     → [10]
- *   "2d6+1"    → [6, 6, 1]
- *   "1d6+1d4"  → [4, 3]
- *   "3"        → [3]
+ *   "1d10"     → { sign:  1, tokens: [10] }
+ *   "-1d6"     → { sign: -1, tokens: [6] }     ← 负号只允许出现在最前
+ *   "+1d6"     → { sign:  1, tokens: [6] }
+ *   "2d6+1"    → { sign:  1, tokens: [6, 6, 1] }
+ *   "1d6+1d4"  → { sign:  1, tokens: [4, 3] }
+ *   "3"        → { sign:  1, tokens: [3] }
  * 失败返回 null。
+ *
+ * `sign` 表示整个表达式的前导符号；`tokens` 仍是占位（骰子的具体值由调用方掷）。
+ * 让上层自行决定是否把符号应用到 total 上。
  */
-export function parseDiceExpression(expr: string): number[] | null {
+export interface DiceParseResult {
+  sign: 1 | -1;
+  tokens: number[];
+}
+export function parseDiceExpression(expr: string): DiceParseResult | null {
   if (!expr || typeof expr !== 'string') return null;
   const cleaned = expr.replace(/\s+/g, '').toLowerCase();
   if (!cleaned) return null;
+  // 只允许一个可选的前导符号
+  const m = cleaned.match(/^([+-]?)(\d+d\d+|\d+)([+-](\d+d\d+|\d+))*$/);
+  if (!m) return null;
+  const sign: 1 | -1 = m[1] === '-' ? -1 : 1;
+  const body = cleaned.replace(/^[+-]/, ''); // 去掉前导符号再按 + 切
+  const tokens = body.split('+');
   const flat: number[] = [];
-  // 支持 N 或 N+M 或 N+M 或 N+dN 或 NdN+M+... 等
-  const tokens = cleaned.split('+');
   for (const t of tokens) {
     if (t.includes('d')) {
-      const m = t.match(/^(\d+)d(\d+)$/);
-      if (!m) return null;
-      const count = parseInt(m[1], 10);
-      const sides = parseInt(m[2], 10);
+      const dm = t.match(/^(\d+)d(\d+)$/);
+      if (!dm) return null;
+      const count = parseInt(dm[1], 10);
+      const sides = parseInt(dm[2], 10);
       if (count < 1 || count > 1000) return null;
       if (sides < 1 || sides > 1000) return null;
       for (let i = 0; i < count; i++) flat.push(0); // 占位（具体值由调用方掷）
@@ -56,15 +69,18 @@ export function parseDiceExpression(expr: string): number[] | null {
       return null;
     }
   }
-  return flat;
+  return { sign, tokens: flat };
 }
 
 /**
- * 投一个骰子表达式，返回总和。
- * 例：rollExpression("2d6+3") = 投两个 6 面骰 + 3。
+ * 投一个骰子表达式，返回带符号的总和。
+ * 例：rollExpression("2d6+3") = 11；rollExpression("-1d6") = -6。
  */
 export function rollExpression(expr: string, rand: RandomFn = defaultRandom): number {
-  const tokens = expr.replace(/\s+/g, '').toLowerCase().split('+');
+  const parsed = parseDiceExpression(expr);
+  if (!parsed) throw new Error(`bad dice expression: ${expr}`);
+  const cleaned = expr.replace(/\s+/g, '').toLowerCase().replace(/^[+-]/, '');
+  const tokens = cleaned.split('+');
   let total = 0;
   for (const t of tokens) {
     if (t.includes('d')) {
@@ -77,26 +93,30 @@ export function rollExpression(expr: string, rand: RandomFn = defaultRandom): nu
       throw new Error(`bad dice token: ${t}`);
     }
   }
-  return total;
+  return parsed.sign * total;
 }
 
 /**
  * 同 rollExpression，但额外返回每一次投骰的个体值，便于日志展示。
  *
- *   rollExpressionDetailed("1d6+1d3")  → { total: 6, rolls: [4, 2], expr: "1d6+1d3" }
- *   rollExpressionDetailed("3")        → { total: 3, rolls: [3],     expr: "3" }
+ *   rollExpressionDetailed("1d6+1d3")  → { sign:  1, total: 6, rolls: [4, 2], expr: "1d6+1d3" }
+ *   rollExpressionDetailed("-1d6")     → { sign: -1, total: -6, rolls: [6], expr: "-1d6" }
+ *   rollExpressionDetailed("3")        → { sign:  1, total:  3, rolls: [3], expr: "3" }
  *
  * 表达式解析失败时抛 Error（让上层决定怎么处理）。
  */
 export interface DiceRollResult {
+  sign: 1 | -1;
   total: number;
   rolls: number[];
   expr: string;
 }
 export function rollExpressionDetailed(expr: string, rand: RandomFn = defaultRandom): DiceRollResult {
+  const parsed = parseDiceExpression(expr);
+  if (!parsed) throw new Error(`bad dice expression: ${expr}`);
   const cleaned = expr.replace(/\s+/g, '').toLowerCase();
-  if (!cleaned) throw new Error('empty dice expression');
-  const tokens = cleaned.split('+');
+  // 重新走一遍纯 token 解析以拿到个体 rolls
+  const tokens = cleaned.replace(/^[+-]/, '').split('+');
   const rolls: number[] = [];
   let total = 0;
   for (const t of tokens) {
@@ -118,7 +138,7 @@ export function rollExpressionDetailed(expr: string, rand: RandomFn = defaultRan
       throw new Error(`bad dice token: ${t}`);
     }
   }
-  return { total, rolls, expr: cleaned };
+  return { sign: parsed.sign, total: parsed.sign * total, rolls, expr: cleaned };
 }
 
 /** 整数范围内随机（含 min / max） */

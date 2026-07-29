@@ -36,21 +36,34 @@ describe('dice', () => {
   describe('parseDiceExpression', () => {
     it('parses "1d10"', () => {
       const r = parseDiceExpression('1d10');
-      expect(r).toHaveLength(1);
+      expect(r).toEqual({ sign: 1, tokens: [0] });
     });
     it('parses "2d6+3"', () => {
-      expect(parseDiceExpression('2d6+3')).toEqual([0, 0, 3]);
+      expect(parseDiceExpression('2d6+3')).toEqual({ sign: 1, tokens: [0, 0, 3] });
     });
     it('parses "1d6+1d4"', () => {
-      expect(parseDiceExpression('1d6+1d4')).toEqual([0, 0]);
+      expect(parseDiceExpression('1d6+1d4')).toEqual({ sign: 1, tokens: [0, 0] });
+    });
+    it('accepts leading "-" (sign = -1)', () => {
+      expect(parseDiceExpression('-1d6')).toEqual({ sign: -1, tokens: [0] });
+      expect(parseDiceExpression('-2d6+1')).toEqual({ sign: -1, tokens: [0, 0, 1] });
+    });
+    it('accepts leading "+" (sign = 1)', () => {
+      expect(parseDiceExpression('+1d6')).toEqual({ sign: 1, tokens: [0] });
+    });
+    it('rejects mid-expression "-" tokens (still throws later in rollExpression)', () => {
+      // parseDiceExpression 只识别 + 拼接；'1d6-1' 走老路 → null
+      expect(parseDiceExpression('1d6-1')).toBe(null);
     });
     it('rejects bad input', () => {
       expect(parseDiceExpression('')).toBe(null);
       expect(parseDiceExpression('abc')).toBe(null);
       expect(parseDiceExpression('1d')).toBe(null);
+      expect(parseDiceExpression('--1d6')).toBe(null);
     });
     it('handles spaces', () => {
-      expect(parseDiceExpression('2d6 + 3')).toEqual([0, 0, 3]);
+      expect(parseDiceExpression('2d6 + 3')).toEqual({ sign: 1, tokens: [0, 0, 3] });
+      expect(parseDiceExpression('- 1d6')).toEqual({ sign: -1, tokens: [0] });
     });
   });
 
@@ -61,6 +74,13 @@ describe('dice', () => {
     });
     it('handles constants', () => {
       expect(rollExpression('5', () => 0)).toBe(5);
+    });
+    it('returns negative total for leading "-"', () => {
+      expect(rollExpression('-1d6', () => 0)).toBe(-1);
+      expect(rollExpression('-2d6+1', () => 0.5)).toBe(-9);  // -(4+4)+1
+    });
+    it('returns positive total for leading "+"', () => {
+      expect(rollExpression('+1d6', () => 0)).toBe(1);
     });
   });
 
@@ -95,7 +115,28 @@ describe('dice', () => {
     });
 
     it('handles plain number', () => {
-      expect(rollExpressionDetailed('5', () => 0)).toEqual({ total: 5, rolls: [5], expr: '5' });
+      expect(rollExpressionDetailed('5', () => 0)).toEqual({ sign: 1, total: 5, rolls: [5], expr: '5' });
+    });
+
+    it('preserves leading "-" sign in total', () => {
+      const r = rollExpressionDetailed('-1d6', () => 0); // 1d6 → 1, sign=-1 → -1
+      expect(r.sign).toBe(-1);
+      expect(r.total).toBe(-1);
+      expect(r.rolls).toEqual([1]);
+      expect(r.expr).toBe('-1d6');
+    });
+
+    it('preserves leading "+" sign as positive', () => {
+      const r = rollExpressionDetailed('+1d6', () => 0);
+      expect(r.sign).toBe(1);
+      expect(r.total).toBe(1);
+    });
+
+    it('composite expr with sign: -1d6+1', () => {
+      const r = rollExpressionDetailed('-1d6+1', () => 0.5); // 1d6→4, +1 = 5, sign=-1 → -5
+      expect(r.sign).toBe(-1);
+      expect(r.total).toBe(-5);
+      expect(r.rolls).toEqual([4, 1]);
     });
 
     it('strips whitespace and lowercases', () => {
