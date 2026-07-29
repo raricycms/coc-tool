@@ -240,7 +240,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
               authorId: e.authorId ?? '',
               authorUsername: findUsername(e.authorId),
               characterId: e.characterId,
-              characterName: findCharacterName(e.characterId),
+              // 优先用持久化 payload 里的 characterName（KP 在「角色发言」模式下
+              // 可指定任意旁白 NPC 名，不挂 characterId）；member 表查找只作兜底。
+              characterName: p?.characterName ?? findCharacterName(e.characterId),
               content: String(p.content ?? ''),
               inGameTime: e.inGameTime ?? '08:00',
               inGameDate: '',
@@ -371,7 +373,9 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             authorId: e.authorId ?? '',
             authorUsername: findUsername(e.authorId),
             characterId: e.characterId,
-            characterName: findCharacterName(e.characterId),
+            // 优先用持久化 payload 里的 characterName（KP 在「角色发言」模式下
+            // 可指定任意旁白 NPC 名，不挂 characterId）；member 表查找只作兜底。
+            characterName: p?.characterName ?? findCharacterName(e.characterId),
             content: String(p.content ?? ''),
             inGameTime: p.inGameTime ?? e.inGameTime ?? '08:00',
             inGameDate: p.inGameDate ?? '1/1',
