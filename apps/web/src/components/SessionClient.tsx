@@ -104,6 +104,13 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   const [icMessages, setIcMessages] = useState<ICMessage[]>([]);
   const [pendingJudgments, setPendingJudgments] = useState<JudgmentCreatedEvent[]>([]);
   const [inspectingCharacterId, setInspectingCharacterId] = useState<string | null>(null);
+  /**
+   * 来自 realtime 的业务错误（如「KP 才能发布判定」「角色没有该技能」）。
+   * 后端在每个 catch 里 emit SOCKET_EVENTS.ERROR，前端必须把 message 透给用户，
+   * 否则表现为「按钮按下后什么都没发生」（典型：用户报告「KP 无法发布判定」，
+   * 但实际后端一直 4xx 只是用户看不到）。空串视为清空。
+   */
+  const [toastError, setToastError] = useState<string | null>(null);
   const socketRef = useRef<Awaited<ReturnType<typeof getSocket>> | null>(null);
 
   const me = members.find((m) => m.userId === currentUserId);
@@ -283,6 +290,12 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
           m.character?.id === characterId ? { ...m, character } : m
         )));
       });
+
+      // realtime 业务错误：每个 handler 的 catch 都会 emit SOCKET_EVENTS.ERROR，
+      // 之前没监听导致后端 4xx 时前端表现成「按下按钮没反应」。
+      s.on(SOCKET_EVENTS.ERROR, ({ message }: { message: string }) => {
+        setToastError(message || '操作失败');
+      });
     });
 
     return () => {
@@ -310,6 +323,7 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       socket.off(SOCKET_EVENTS.CLOCK_STATE);
       socket.off(SOCKET_EVENTS.PRESENCE_UPDATE);
       socket.off(SOCKET_EVENTS.CHARACTER_UPDATED);
+      socket.off(SOCKET_EVENTS.ERROR);
     };
   }, [sessionId]);
 
@@ -510,6 +524,20 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
       {!connected && (
         <div className="border-b border-warn bg-warn/15 px-4 py-2 text-center text-sm text-warn">
           {connectError ?? '连接已断开，正在重连…'}
+        </div>
+      )}
+
+      {toastError && (
+        <div className="flex items-start justify-between gap-3 border-b border-bad bg-bad/10 px-4 py-2 text-sm text-bad">
+          <span className="flex-1 whitespace-pre-wrap">{toastError}</span>
+          <button
+            type="button"
+            aria-label="关闭错误提示"
+            className="text-bad/70 transition hover:text-bad"
+            onClick={() => setToastError(null)}
+          >
+            ✕
+          </button>
         </div>
       )}
 
