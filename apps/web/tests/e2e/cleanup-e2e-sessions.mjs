@@ -26,7 +26,7 @@
 const WEB = process.env.WEB_ORIGIN || 'http://raricy.com:7766';
 
 function makeCookieJar() {
-  const jar = new Map();
+  const cookieJar = new Map();
   function applySetCookies(headers) {
     const list = typeof headers.getSetCookie === 'function'
       ? headers.getSetCookie()
@@ -34,16 +34,16 @@ function makeCookieJar() {
     for (const raw of list) {
       const first = raw.split(';')[0].trim();
       const eq = first.indexOf('=');
-      if (eq > 0) jar.set(first.slice(0, eq), first.slice(eq + 1));
+      if (eq > 0) cookieJar.set(first.slice(0, eq), first.slice(eq + 1));
     }
   }
-  return { jar, applySetCookies };
+  return { cookieJar, applySetCookies };
 }
 
 function makeClient(jar) {
   return async function jreq(path, init = {}) {
     const headers = new Headers(init.headers || {});
-    if (jar.size) headers.set('cookie', [...jar].map(([k, v]) => `${k}=${v}`).join('; '));
+    if (jar.cookieJar.size) headers.set('cookie', [...jar.cookieJar].map(([k, v]) => `${k}=${v}`).join('; '));
     if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
     const r = await fetch(WEB + path, { ...init, headers });
     jar.applySetCookies(r.headers);
