@@ -1,35 +1,14 @@
-'use client';
+/**
+ * 把一条 LogEntryPayload 渲染成画外聊天里的事件行。
+ * 事件日志与 OOC 消息共用同一时间轴展示，所以行样式与 OOC 一致（左侧色条 + 时间戳 + 内容）。
+ */
 
-import { useRef } from 'react';
 import type { LogEntryPayload } from '@coc-tools/shared';
-import { HistorySentinel } from './HistorySentinel';
-import { useStickyScroll } from './useStickyScroll';
 
-interface Member {
-  userId: string;
-  username: string;
-  character?: {
-    id: string; name: string;
-    hp: number; hpMax: number;
-    san: number; sanMax: number;
-  };
-}
-
-interface Props {
-  logs: LogEntryPayload[];
-  members: Member[];
-  history: {
-    initialized: boolean;
-    hasMore: boolean;
-    loading: boolean;
-    error?: string | null;
-    onLoadMore: () => void;
-  };
-  /**
-   * 父组件递增此值时通知 hook 「下一次消息变化是 prepend」，保持 scrollTop 不动。
-   * 与 history.onLoadMore 配套使用：loadMore 前 increment 一次。
-   */
-  prependSignal: number;
+export interface LogCharInfo {
+  id: string; name: string;
+  hp: number; hpMax: number;
+  san: number; sanMax: number;
 }
 
 const SUCCESS_LABEL: Record<string, string> = {
@@ -47,59 +26,13 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   extreme: '极难',
 };
 
-/**
- * 事件日志：默认就是一整列可滚动列表（与聊天一致）。
- *  - 新事件追加在底部，自动滚到底部（仅在用户原本就贴底时）
- *  - 顶部有「加载更早的事件」哨兵，调用方传入 history props
- */
-export function LogPanel({ logs, members, history, prependSignal }: Props) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const { onScroll } = useStickyScroll(scrollerRef, [logs.length], prependSignal);
-
-  const findChar = (id?: string) => members.find((m) => m.character?.id === id)?.character;
-
-  return (
-    <section className="card flex min-h-0 flex-col">
-      <header className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">
-          事件日志 · {logs.length}
-        </h3>
-      </header>
-      <div
-        ref={scrollerRef}
-        onScroll={onScroll}
-        className="h-[480px] space-y-1 overflow-y-auto overflow-x-hidden pr-1 text-xs lg:h-[640px]"
-      >
-        <HistorySentinel
-          initialized={history.initialized}
-          loading={history.loading}
-          hasMore={history.hasMore}
-          error={history.error ?? null}
-          onLoadMore={history.onLoadMore}
-          label="加载更早的事件"
-          exhaustedLabel="已加载全部事件"
-        />
-        {logs.length === 0 ? (
-          <p className="py-6 text-center text-ink-muted">暂无</p>
-        ) : (
-          logs.map((e) => (
-            <div key={e.id} className="min-w-0 border-l-2 border-sky-200 pl-2.5">
-              <div className="break-words text-[10px] text-ink-muted">
-                {new Date(e.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
-                {e.inGameTime && ` · ⏰ ${e.inGameTime}`}
-              </div>
-              <div className="break-words">
-                <LogEntryRender entry={e} findChar={findChar} />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function LogEntryRender({ entry, findChar }: { entry: LogEntryPayload; findChar: (id?: string) => Member['character'] | undefined }) {
+export function LogEntryRender({
+  entry,
+  findChar,
+}: {
+  entry: LogEntryPayload;
+  findChar: (id?: string) => LogCharInfo | undefined;
+}) {
   const p = entry.payload as any;
   switch (entry.type) {
     case 'JUDGMENT':
@@ -158,7 +91,7 @@ function ClockLogLine({ payload }: { payload: any }) {
 }
 
 function JudgmentLogLine({ entry, payload, findChar }: {
-  entry: LogEntryPayload; payload: any; findChar: (id?: string) => Member['character'] | undefined;
+  entry: LogEntryPayload; payload: any; findChar: (id?: string) => LogCharInfo | undefined;
 }) {
   const char = findChar(entry.characterId);
   const charName = char?.name ?? entry.characterId ?? '?';
@@ -211,7 +144,7 @@ function JudgmentLogLine({ entry, payload, findChar }: {
 }
 
 function HpChangeLogLine({ entry, payload, findChar }: {
-  entry: LogEntryPayload; payload: any; findChar: (id?: string) => Member['character'] | undefined;
+  entry: LogEntryPayload; payload: any; findChar: (id?: string) => LogCharInfo | undefined;
 }) {
   const char = findChar(entry.characterId);
   const name = char?.name ?? entry.characterId ?? '?';
@@ -233,7 +166,7 @@ function HpChangeLogLine({ entry, payload, findChar }: {
 }
 
 function SanChangeLogLine({ entry, payload, findChar }: {
-  entry: LogEntryPayload; payload: any; findChar: (id?: string) => Member['character'] | undefined;
+  entry: LogEntryPayload; payload: any; findChar: (id?: string) => LogCharInfo | undefined;
 }) {
   const char = findChar(entry.characterId);
   const name = char?.name ?? entry.characterId ?? '?';

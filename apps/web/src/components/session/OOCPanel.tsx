@@ -1,12 +1,27 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import type { OOCMessage } from '@coc-tools/shared';
+import { useState, useRef, useMemo } from 'react';
+import type { OOCMessage, LogEntryPayload } from '@coc-tools/shared';
 import { HistorySentinel } from './HistorySentinel';
 import { useStickyScroll } from './useStickyScroll';
+import { LogEntryRender, type LogCharInfo } from './LogEntryRender';
+
+interface MemberCharacter {
+  id: string; name: string;
+  hp: number; hpMax: number;
+  san: number; sanMax: number;
+}
+
+interface MemberLite {
+  userId: string;
+  username: string;
+  character?: MemberCharacter;
+}
 
 interface Props {
   messages: OOCMessage[];
+  logs: LogEntryPayload[];
+  members: MemberLite[];
   onSend: (content: string) => void;
   canSend: boolean;
   currentUsername: string;
@@ -24,10 +39,45 @@ interface Props {
   prependSignal: number;
 }
 
-export function OOCPanel({ messages, onSend, canSend, currentUsername, history, prependSignal }: Props) {
+/**
+ * 单条统一时间轴的渲染单元：
+ *  - kind=ooc：画外聊天消息
+ *  - kind=log：事件日志（判定 / HP 变动 / SAN 变动 / 公开掷骰 / 时钟 / 系统…）
+ * 用 realTime 排序，所以「在场的人说了一句」和「KP 投了一只骰」能按发生顺序穿插。
+ */
+type FeedItem =
+  | { kind: 'ooc'; t: number; id: string; msg: OOCMessage }
+  | { kind: 'log'; t: number; id: string; entry: LogEntryPayload };
+
+function toMs(iso: string): number {
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+export function OOCPanel({
+  messages,
+  logs,
+  members,
+  onSend,
+  canSend,
+  currentUsername,
+  history,
+  prependSignal,
+}: Props) {
   const [input, setInput] = useState('');
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const { onScroll } = useStickyScroll(scrollerRef, [messages.length], prependSignal);
+
+  // 按 realTime 合并并排序；stable 排序基于数组索引，同时间戳时 OOC 在前。
+  const feed: FeedItem[] = useMemo(() => {
+    const oocItems: FeedItem[] = messages.map((m) => ({ kind: 'ooc', t: toMs(m.realTime), id: m.id, msg: m }));
+    const logItems: FeedItem[] = logs.map((e) => ({ kind: 'log', t: toMs(e.realTime), id: e.id, entry: e }));
+    const all = [...oocItems, ...logItems];
+    all.sort((a, b) => (a.t - b.t) || (a.kind === 'ooc' ? -1 : 1));
+    return all;
+  }, [messages, logs]);
+
+  // useStickyScroll 需要感知「消息数量变化」，用 feed.length 作为依赖。
+  const { onScroll } = useStickyScroll(scrollerRef, [feed.length], prependSignal);
 
   const send = () => {
     if (!input.trim()) return;
@@ -35,11 +85,16 @@ export function OOCPanel({ messages, onSend, canSend, currentUsername, history, 
     setInput('');
   };
 
+  const findChar = (id?: string): LogCharInfo | undefined => {
+    const m = members.find((x) => x.character?.id === id);
+    return m?.character;
+  };
+
   return (
     <div className="card flex min-h-0 flex-col">
       <header className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-soft">画外 · OOC</h3>
-        <span className="text-[11px] text-ink-muted">{messages.length} 条</span>
+        <span className="text-[11px] text-ink-muted">{feed.length} 条</span>
       </header>
       <div
         ref={scrollerRef}
@@ -53,21 +108,40 @@ export function OOCPanel({ messages, onSend, canSend, currentUsername, history, 
           error={history.error ?? null}
           onLoadMore={history.onLoadMore}
         />
-        {messages.length === 0 ? (
+        {feed.length === 0 ? (
           <p className="py-8 text-center text-ink-muted">还没有消息</p>
         ) : (
-          messages.map((m) => (
-            <div key={m.id} className="border-l-2 border-sky-200 pl-2.5">
-              <div className="text-[11px] text-ink-soft">
-                <span className={m.authorUsername === currentUsername ? 'font-semibold text-macaron-600' : ''}>
-                  @{m.authorUsername}
-                </span>
-                {' · '}
-                {new Date(m.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
+          feed.map((item) => {
+            if (item.kind === 'ooc') {
+              const m = item.msg;
+              return (
+                <div key={`ooc-${item.id}`} className="border-l-2 border-sky-200 pl-2.5">
+                  <div className="text-[11px] text-ink-soft">
+                    <span className={m.authorUsername === currentUsername ? 'font-semibold text-macaron-600' : ''}>
+                      @{m.authorUsername}
+                    </span>
+                    {' · '}
+                    {new Date(m.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
+                  </div>
+                  <div className="whitespace-pre-wrap text-ink">{m.content}</div>
+                </div>
+              );
+            }
+            // 事件日志：复用原 LogPanel 的渲染逻辑，但与 OOC 共用左侧色条样式。
+            return (
+              <div key={`log-${item.id}`} className="border-l-2 border-sky-200 pl-2.5">
+                <div className="text-[11px] text-ink-soft">
+                  <span className="font-mono">⚙ 事件</span>
+                  {' · '}
+                  {new Date(item.entry.realTime).toLocaleTimeString('zh-CN', { hour12: false })}
+                  {item.entry.inGameTime && ` · ⏰ ${item.entry.inGameTime}`}
+                </div>
+                <div className="break-words">
+                  <LogEntryRender entry={item.entry} findChar={findChar} />
+                </div>
               </div>
-              <div className="whitespace-pre-wrap text-ink">{m.content}</div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       {canSend && (

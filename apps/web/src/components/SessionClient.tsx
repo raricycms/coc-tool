@@ -9,7 +9,6 @@ import type {
 } from '@coc-tools/shared';
 import { OOCPanel } from './session/OOCPanel';
 import { ICPanel } from './session/ICPanel';
-import { LogPanel } from './session/LogPanel';
 import { ClockPanel } from './session/ClockPanel';
 import { PresenceBar } from './session/PresenceBar';
 import { JudgmentCreator } from './session/JudgmentCreator';
@@ -408,18 +407,18 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   const loadMoreOOC = useCallback(() => {
     const s = socketRef.current;
     if (!s) return;
-    const cur = history.chat;
-    if (cur.loading || !cur.hasMore || !cur.initialized) return;
-    fetchHistory(s, 'chat', cur.cursor ?? undefined);
-  }, [history.chat]);
-
-  const loadMoreLogs = useCallback(() => {
-    const s = socketRef.current;
-    if (!s) return;
-    const cur = history.logs;
-    if (cur.loading || !cur.hasMore || !cur.initialized) return;
-    fetchHistory(s, 'logs', cur.cursor ?? undefined);
-  }, [history.logs]);
+    // OOC 面板现在与事件日志共用同一条时间轴，所以「加载更早」必须把
+    // chat 与 logs 两个通道都翻一页，否则只有 OOC 消息往前推、日志停住，
+    // 体验上会出现「上半段穿插很整齐、下半段只剩聊天」的撕裂。
+    const curChat = history.chat;
+    if (!curChat.loading && curChat.hasMore && curChat.initialized) {
+      fetchHistory(s, 'chat', curChat.cursor ?? undefined);
+    }
+    const curLogs = history.logs;
+    if (!curLogs.loading && curLogs.hasMore && curLogs.initialized) {
+      fetchHistory(s, 'logs', curLogs.cursor ?? undefined);
+    }
+  }, [history.chat, history.logs]);
 
   // IC 与 OOC 共用 'chat' 通道（一次请求按 type 分流给两侧）。
   const loadMoreIC = loadMoreOOC;
@@ -498,10 +497,11 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
   }, [inspectingCharacterId]);
 
   const oocHistoryProps = {
-    initialized: history.chat.initialized,
-    hasMore: history.chat.hasMore,
-    loading: history.chat.loading,
-    error: history.chat.error,
+    // 事件日志与 OOC 消息共用同一条时间轴；只要任意一侧还没拉到头就一直显示「加载更早」。
+    initialized: history.chat.initialized || history.logs.initialized,
+    hasMore: history.chat.hasMore || history.logs.hasMore,
+    loading: history.chat.loading || history.logs.loading,
+    error: history.chat.error ?? history.logs.error ?? null,
     onLoadMore: loadMoreOOC,
   };
   const icHistoryProps = {
@@ -510,13 +510,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
     loading: history.chat.loading,
     error: history.chat.error,
     onLoadMore: loadMoreIC,
-  };
-  const logsHistoryProps = {
-    initialized: history.logs.initialized,
-    hasMore: history.logs.hasMore,
-    loading: history.logs.loading,
-    error: history.logs.error,
-    onLoadMore: loadMoreLogs,
   };
 
   return (
@@ -557,11 +550,24 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
         <div className="flex min-h-[20rem] flex-col lg:min-h-0">
           <OOCPanel
             messages={oocMessages}
+            logs={logs}
+            members={members.map((m) => ({
+              userId: m.userId,
+              username: m.username,
+              character: m.character ? {
+                id: m.character.id,
+                name: m.character.name,
+                hp: m.character.hp,
+                hpMax: m.character.hpMax,
+                san: m.character.san,
+                sanMax: m.character.sanMax,
+              } : undefined,
+            }))}
             onSend={sendOOC}
             canSend={true}
             currentUsername={me?.username ?? ''}
             history={oocHistoryProps}
-            prependSignal={history.chat.prependSignal}
+            prependSignal={Math.max(history.chat.prependSignal, history.logs.prependSignal)}
           />
         </div>
 
@@ -617,12 +623,6 @@ export function SessionClient({ sessionId, role, currentUserId, initialClock, in
             members={members}
             onRoll={rollJudgment}
             onCancel={cancelJudgment}
-          />
-          <LogPanel
-            logs={logs}
-            members={members}
-            history={logsHistoryProps}
-            prependSignal={history.logs.prependSignal}
           />
         </div>
       </div>
