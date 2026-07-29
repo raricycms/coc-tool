@@ -11,7 +11,8 @@ export async function GET(_req: NextRequest) {
   try {
     const user = await requireUser();
     const list = await prisma.character.findMany({
-      where: { ownerId: user.id },
+      // 删除/撕卡的 RETIRED 车卡仍可在详情页直接访问，但不列入「我的车卡」列表。
+      where: { ownerId: user.id, status: { not: 'RETIRED' } },
       orderBy: { updatedAt: 'desc' },
       include: { skills: true, weapons: true, equipment: true },
     });

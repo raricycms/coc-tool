@@ -11,7 +11,8 @@ export default async function DashboardPage() {
 
   const [characters, asKpSessions, asPlSessions, myRecruitments, openRecruitments, spectatableSessions] = await Promise.all([
     prisma.character.findMany({
-      where: { ownerId: user.id },
+      // 删除/撕卡的车卡不再出现在「我的车卡」预览。
+      where: { ownerId: user.id, status: { not: 'RETIRED' } },
       orderBy: { updatedAt: 'desc' },
       take: 5,
     }),

@@ -10,7 +10,9 @@ export default async function CharactersListPage() {
   if (!user) redirect('/login');
 
   const characters = await prisma.character.findMany({
-    where: { ownerId: user.id },
+    // 删除/撕卡/死亡/永久疯狂都会把 status 置为 RETIRED；这些车卡仍在库里但
+    // 不再是「可用」，从列表里滤掉，避免误选进新团。
+    where: { ownerId: user.id, status: { not: 'RETIRED' } },
     orderBy: { updatedAt: 'desc' },
   });
 
