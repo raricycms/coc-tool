@@ -94,6 +94,12 @@ describe('judgment', () => {
 
       // 难度 hard 时维持 hard
       { final: 25, skill: 50, difficulty: 'hard', expected: 'hard' },
+
+      // 奇数 skill：困难阈值应是 floor(skill/2)（向下取整）
+      { final: 25, skill: 51, difficulty: 'regular', expected: 'hard' },    // 51/2=25.5 → 25
+      { final: 26, skill: 51, difficulty: 'regular', expected: 'success' }, // 51/2=25.5 → 25，26 > 25
+      { final: 24, skill: 49, difficulty: 'regular', expected: 'hard' },    // 49/2=24.5 → 24
+      { final: 25, skill: 49, difficulty: 'regular', expected: 'success' }, // 49/2=24.5 → 24，25 > 24
     ];
 
     for (const c of cases) {
